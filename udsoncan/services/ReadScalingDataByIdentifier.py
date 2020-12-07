@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -13,12 +14,12 @@ class ReadScalingDataByIdentifier(BaseService):
 
     @classmethod
     def make_request(cls):
-        raise NotImplementedError('Service is not implemented')
+        raise NotImplementedError(u'Service is not implemented')
 
     @classmethod
     def interpret_response(cls, response):
-        raise NotImplementedError('Service is not implemented')
+        raise NotImplementedError(u'Service is not implemented')
 
     class ResponseData(BaseResponseData):	
         def __init__(self):
-            super().__init__(ReadScalingDataByIdentifier)
+            super(ReadScalingDataByIdentifier.ResponseData, self).__init__(ReadScalingDataByIdentifier)

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -20,13 +21,13 @@ class RequestUpload(BaseService):
             dfi = DataFormatIdentifier()
 
         if not isinstance(dfi, DataFormatIdentifier):
-            raise ValueError('dfi must be an instance of DataFormatIdentifier')
+            raise ValueError(u'dfi must be an instance of DataFormatIdentifier')
 
         return dfi
 
     @classmethod
     def make_request(cls, memory_location, dfi=None):
-        """
+        u"""
         Generates a request for RequestUpload
 
         :param memory_location: The address and the size of the memory block to be read.
@@ -43,10 +44,10 @@ class RequestUpload(BaseService):
         dfi = cls.normalize_data_format_identifier(dfi)
 
         if not isinstance(memory_location, MemoryLocation):
-            raise ValueError('memory_location must be an instance of MemoryLocation')
+            raise ValueError(u'memory_location must be an instance of MemoryLocation')
 
         request = Request(service=cls)
-        request.data=b""
+        request.data=""
         request.data += dfi.get_byte()	# Data Format Identifier
         request.data += memory_location.alfid.get_byte()	# AddressAndLengthFormatIdentifier
         request.data += memory_location.get_address_bytes()
@@ -56,7 +57,7 @@ class RequestUpload(BaseService):
 
     @classmethod
     def interpret_response(cls, response):
-        """
+        u"""
         Populates the response ``service_data`` property with an instance of :class:`RequestUpload.ResponseData<udsoncan.services.RequestUpload.ResponseData>`
 
         :param response: The received response to interpret
@@ -67,29 +68,29 @@ class RequestUpload(BaseService):
         """	
 
         if len(response.data) < 1:
-            raise InvalidResponseException(response, "Response data must be at least 1 bytes")
+            raise InvalidResponseException(response, u"Response data must be at least 1 bytes")
 
-        lfid = int(response.data[0]) >> 4
+        lfid = int(ord(response.data[0])) >> 4
 
         if lfid > 8:
-            raise NotImplementedError('This client does not support number bigger than %d bits' % (8*8))
+            raise NotImplementedError(u'This client does not support number bigger than %d bits' % (8*8))
 
         if len(response.data) < lfid+1:
-            raise InvalidResponseException(response, "Length of data (%d) is too short to contains the number of block of given length (%d)" % (len(response.data), lfid))
+            raise InvalidResponseException(response, u"Length of data (%d) is too short to contains the number of block of given length (%d)" % (len(response.data), lfid))
 
-        todecode = bytearray(b'\x00\x00\x00\x00\x00\x00\x00\x00')
-        for i in range(1,lfid+1):
-            todecode[-i] = response.data[lfid+1-i]
+        todecode = bytearray('\x00\x00\x00\x00\x00\x00\x00\x00')
+        for i in xrange(1,lfid+1):
+            todecode[-i] = ord(response.data[lfid+1-i])
 
         response.service_data = cls.ResponseData()
-        response.service_data.max_length = struct.unpack('>q', todecode)[0]
+        response.service_data.max_length = struct.unpack(u'>q', todecode)[0]
 
     class ResponseData(BaseResponseData):
-        """
+        u"""
         .. data:: max_length
 
                 (int) Maximum number of data blocks to read
         """				
         def __init__(self):
-            super().__init__(RequestUpload)
+            super(RequestUpload.ResponseData, self).__init__(RequestUpload)
             self.max_length = None

@@ -1,6 +1,7 @@
+from __future__ import absolute_import
 from udsoncan.exceptions import TimeoutException
 from udsoncan import connections, Request, Response
-import queue
+import Queue
 import logging
 import socket
 
@@ -14,7 +15,7 @@ class StubbedIsoTPSocket(object):
         self.txid=None
         self.timeout = timeout
 
-        self.queue_in = queue.Queue()	# Client reads from this queue. Other end is simulated
+        self.queue_in = Queue.Queue()	# Client reads from this queue. Other end is simulated
 
     def bind(self, interface, rxid, txid):
         self.interface = interface
@@ -44,7 +45,7 @@ class StubbedIsoTPSocket(object):
     def recv(self):
         try:
             payload = self.queue_in.get(block=True, timeout=self.timeout)
-        except queue.Empty:
+        except Queue.Empty:
             raise socket.timeout 
         return payload
 

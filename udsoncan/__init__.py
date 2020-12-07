@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import division
+from __future__ import absolute_import
 import inspect
 import struct
 import math
+math.log2 = lambda n: math.log(n, 2)
 
 from udsoncan.exceptions import *
 from udsoncan.Request import Request
@@ -11,20 +14,28 @@ from udsoncan.Response import Response
 
 import logging, logging.config
 from os import path
-__default_log_config_file = path.join(path.dirname(path.abspath(__file__)), 'logging.conf')
+__default_log_config_file = path.join(path.dirname(path.abspath(__file__)), u'logging.conf')
+
+def to_bytes(n, length, endianess='big'):
+    u"""
+    https://stackoverflow.com/questions/16022556/has-python-3-to-bytes-been-back-ported-to-python-2-7
+    """
+    h = '%x' % n
+    s = ('0'*(len(h) % 2) + h).zfill(length*2).decode('hex')
+    return s if endianess == 'big' else s[::-1]
 
 def setup_logging(config_file = __default_log_config_file):
-    """
+    u"""
     This function setup the logger accordingly to the module provided cfg file
     """
     try:
         logging.config.fileConfig(config_file)
-    except Exception as e:
-        logging.warning('Cannot load logging configuration from %s. %s:%s' % (config_file, e.__class__.__name__, str(e)))
+    except Exception, e:
+        logging.warning(u'Cannot load logging configuration from %s. %s:%s' % (config_file, e.__class__.__name__, unicode(e)))
 
 #Define how to encode/decode a Data Identifier value to/from a binary payload
-class DidCodec:
-    """
+class DidCodec(object):
+    u"""
     This class defines how to encode/decode a Data Identifier value to/from a binary payload.
 
     One should extend this class and override the ``encode``, ``decode``, ``__len__`` methods as they will be used
@@ -48,20 +59,20 @@ class DidCodec:
 
     def encode(self, *did_value):
         if self.packstr is None:
-            raise NotImplementedError('Cannot encode DID to binary payload. Codec has no "encode" implementation')
+            raise NotImplementedError(u'Cannot encode DID to binary payload. Codec has no "encode" implementation')
 
         return struct.pack(self.packstr, *did_value)
 
     def decode(self, did_payload):
         if self.packstr is None:
-            raise NotImplementedError('Cannot decode DID from binary payload. Codec has no "decode" implementation')
+            raise NotImplementedError(u'Cannot decode DID from binary payload. Codec has no "decode" implementation')
 
         return struct.unpack(self.packstr, did_payload)
 
     #Must tell the size of the payload encoded or expected for decoding
     def __len__(self):
         if self.packstr is None:
-            raise NotImplementedError('Cannot tell the payload size. Codec has no "__len__" implementation')
+            raise NotImplementedError(u'Cannot tell the payload size. Codec has no "__len__" implementation')
         return struct.calcsize(self.packstr)
 
     @classmethod
@@ -74,32 +85,32 @@ class DidCodec:
             return didconfig()
 
         # It could be that the codec is in a dict. (for io_control)
-        if isinstance(didconfig, dict) and 'codec' in didconfig:
-            return cls.from_config(didconfig['codec'])
+        if isinstance(didconfig, dict) and u'codec' in didconfig:
+            return cls.from_config(didconfig[u'codec'])
 
         # The codec can be defined by a struct pack/unpack string
-        if isinstance(didconfig, str):
+        if isinstance(didconfig, unicode):
             if len(didconfig) == 0:
-                raise ValueError("pack/unpack string given for Codec config should not be empty.")
+                raise ValueError(u"pack/unpack string given for Codec config should not be empty.")
             return cls(packstr = didconfig)
 
-        raise ValueError('Given codec of type %s is not a valid DidCodec' % (type(didconfig)))
+        raise ValueError(u'Given codec of type %s is not a valid DidCodec' % (type(didconfig)))
 
 class AsciiCodec(DidCodec):
     def __init__(self, string_len=None):
         if string_len is None:
-            raise ValueError("You must provide a string length to the AsciiCodec")
+            raise ValueError(u"You must provide a string length to the AsciiCodec")
         self.string_len = string_len
 
     def encode(self, string_ascii):
         if len(string_ascii) != self.string_len:
-            raise ValueError('String must be %d long' % self.string_len)
-        return string_ascii.encode('ascii')
+            raise ValueError(u'String must be %d long' % self.string_len)
+        return string_ascii.encode(u'ascii')
 
     def decode(self, string_bin):
-        string_ascii = string_bin.decode('ascii')
+        string_ascii = string_bin.decode(u'ascii')
         if len(string_ascii) != self.string_len:
-            raise ValueError('Trying to decode a string of %d bytes but codec expects %d bytes' % (len(string_ascii), self.string_len))
+            raise ValueError(u'Trying to decode a string of %d bytes but codec expects %d bytes' % (len(string_ascii), self.string_len))
         return string_ascii
 
     def __len__(self):
@@ -107,16 +118,16 @@ class AsciiCodec(DidCodec):
 
 
 # Some standards, such as J1939, break down the 3-byte ID into 2-byte ID and 1-byte subtypes. 
-class Dtc:
-    """
+class Dtc(object):
+    u"""
     Defines a Diagnostic Trouble Code which consist of a 3-byte ID, a status, a severity and some diagnostic data.
 
     :param dtcid: The 3-byte ID of the DTC
     :type dtcid: int
 
     """
-    class Format:
-        """
+    class Format(object):
+        u"""
         Provide a list of DTC formats and their indices. These values are used by the :ref:`The ReadDTCInformation<ReadDtcInformation>` when requesting a number of DTCs.		
         """
         ISO15031_6 = 0
@@ -127,10 +138,10 @@ class Dtc:
         @classmethod
         def get_name(cls, given_id):
             if given_id is None:
-                return ""
+                return u""
 
             for member in inspect.getmembers(cls):
-                if isinstance(member[1], int):
+                if isinstance(member[1], (int, long)):
                     if member[1] == given_id:
                         return member[0]
 
@@ -138,8 +149,8 @@ class Dtc:
 
     # DTC Status byte
     # This byte is an 8-bit flag indicating how much we are sure that a DTC is active.
-    class Status:
-        """
+    class Status(object):
+        u"""
         Represents a DTC status which consists of 8 boolean flags (a byte). All flags can be set after instantiation without problems. 
 
         :param test_failed: DTC is no longer failed at the time of the request
@@ -191,14 +202,14 @@ class Dtc:
             return byte
 
         def get_byte(self):	# Returns the status byte in "bytes" format for payload creation
-            return struct.pack('B', self.get_byte_as_int())
+            return struct.pack(u'B', self.get_byte_as_int())
 
         def set_byte(self, byte):	# Set all the status flags from the status byte
-            if not isinstance(byte, int) and not isinstance(byte, bytes):
-                raise ValueError('Given byte must be an integer or bytes object.')
+            if not isinstance(byte, (int, long)) and not isinstance(byte, str):
+                raise ValueError(u'Given byte must be an integer or bytes object.')
 
-            if isinstance(byte, bytes):
-                byte = struct.unpack('B', byte[0])
+            if isinstance(byte, str):
+                byte = struct.unpack(u'B', byte[0])
 
             self.test_failed 								= True if byte & 0x01 > 0 else False
             self.test_failed_this_operation_cycle 			= True if byte & 0x02 > 0 else False
@@ -216,8 +227,8 @@ class Dtc:
             return status
 
     # DTC Severity byte, it's a 3-bit indicator telling how serious a trouble code is.
-    class Severity:
-        """
+    class Severity(object):
+        u"""
         Represents a DTC severity which consists of 3 boolean flags. All flags can be set after instantiation without problems. 
 
         :param maintenance_only: This value indicates that the failure requests maintenance only
@@ -243,14 +254,14 @@ class Dtc:
             return byte
 
         def get_byte(self):
-            return struct.pack('B', self.get_byte_as_int())
+            return struct.pack(u'B', self.get_byte_as_int())
 
         def set_byte(self, byte):
-            if not isinstance(byte, int) and not isinstance(byte, bytes):
-                raise ValueError('Given byte must be an integer or bytes object.')
+            if not isinstance(byte, (int, long)) and not isinstance(byte, str):
+                raise ValueError(u'Given byte must be an integer or bytes object.')
 
-            if isinstance(byte, bytes):
-                byte = struct.unpack('B', byte[0])
+            if isinstance(byte, str):
+                byte = struct.unpack(u'B', byte[0])
 
             self.maintenance_only 			= True if byte & 0x20 > 0 else False
             self.check_at_next_exit 		= True if byte & 0x40 > 0 else False
@@ -272,25 +283,25 @@ class Dtc:
 
 
     def __repr__(self):
-        return '<DTC ID=0x%06x, Status=0x%02x, Severity=0x%02x at 0x%08x>' % (self.id, self.status.get_byte_as_int(), self.severity.get_byte_as_int(), id(self))
+        return u'<DTC ID=0x%06x, Status=0x%02x, Severity=0x%02x at 0x%08x>' % (self.id, self.status.get_byte_as_int(), self.severity.get_byte_as_int(), id(self))
 
     # A snapshot data. Not defined by ISO14229 and implementation specific. 
     # To read this data, the client must have a DID codec set in its config.
-    class Snapshot:
+    class Snapshot(object):
         record_number = None
         did = None
         data = None
-        raw_data = b''
+        raw_data = ''
 
     # Extended data. Not defined by ISO14229 and implementation specific
     # Only raw data can be given to user.
-    class ExtendedData:
+    class ExtendedData(object):
         record_number = None
-        raw_data = b''
+        raw_data = ''
 
 
-class AddressAndLengthFormatIdentifier:
-    """
+class AddressAndLengthFormatIdentifier(object):
+    u"""
     This class defines how many bytes of a memorylocation, composed of an address and a memorysize, should be encoded when sent over the underlying protocol.
     Mainly used by :ref:`ReadMemoryByAddress<ReadMemoryByAddress>`, :ref:`WriteMemoryByAddress<WriteMemoryByAddress>`, :ref:`RequestDownload<RequestDownload>` and :ref:`RequestUpload<RequestUpload>` services
 
@@ -320,13 +331,13 @@ class AddressAndLengthFormatIdentifier:
 
     def __init__(self, address_format, memorysize_format):
         if address_format not in self.address_map:
-            raise ValueError('address_format must ba an integer selected from : %s ' % (self.address_map.keys()))
+            raise ValueError(u'address_format must ba an integer selected from : %s ' % (self.address_map.keys()))
 
-        if not isinstance(memorysize_format, int) or not isinstance(address_format, int):
-            raise ValueError('memorysize_format and address_format must be integers')
+        if not isinstance(memorysize_format, (int, long)) or not isinstance(address_format, (int, long)):
+            raise ValueError(u'memorysize_format and address_format must be integers')
 
         if memorysize_format not in self.memsize_map:
-            raise ValueError('memorysize_format must be an integer selected from : %s' % (self.memsize_map.keys()))
+            raise ValueError(u'memorysize_format must be an integer selected from : %s' % (self.memsize_map.keys()))
 
 
         self.memorysize_format = memorysize_format
@@ -337,10 +348,10 @@ class AddressAndLengthFormatIdentifier:
 
     # Byte given alongside a memory address and a length so that they are decoded properly.
     def get_byte(self):
-        return  struct.pack('B', self.get_byte_as_int())
+        return  struct.pack(u'B', self.get_byte_as_int())
 
-class MemoryLocation:
-    """
+class MemoryLocation(object):
+    u"""
     This class defines a memory block location including : address, size, AddressAndLengthFormatIdentifier (address format and memory size format)
 
     :param address: A memory address pointing to the beginning of the memory block
@@ -396,23 +407,23 @@ class MemoryLocation:
 
     # Finds the smallest size that fits the address
     def autosize_address(self, val):
-        fmt = math.ceil(val.bit_length()/8)*8
+        fmt = int(math.ceil((len(bin(val)) - 2)/8))*8
         if fmt > 40:
-            raise ValueError("address size must be smaller or equal than 40 bits")
+            raise ValueError(u"address size must be smaller or equal than 40 bits")
         return fmt
 
     # Finds the smallest size that fits the memory size
     def autosize_memorysize(self, val):
-        fmt = math.ceil(val.bit_length()/8)*8
+        fmt = int(math.ceil((len(bin(val)) - 2)/8))*8
         if fmt > 32:
-            raise ValueError("memory size must be smaller or equal than 32 bits")
+            raise ValueError(u"memory size must be smaller or equal than 32 bits")
         return fmt
 
     # Gets the address byte in the requested format
     def get_address_bytes(self):
         n = AddressAndLengthFormatIdentifier.address_map[self.alfid.address_format]
 
-        data = struct.pack('>q', self.address)
+        data = struct.pack(u'>q', self.address)
         return data[-n:]
 
 
@@ -420,42 +431,42 @@ class MemoryLocation:
     def get_memorysize_bytes(self):
         n = AddressAndLengthFormatIdentifier.memsize_map[self.alfid.memorysize_format]
 
-        data = struct.pack('>q', self.memorysize)
+        data = struct.pack(u'>q', self.memorysize)
         return data[-n:]
 
     # Generates an instance from the byte stream
     @classmethod
     def from_bytes(cls, address_bytes, memorysize_bytes):
-        if not isinstance(address_bytes, bytes):
-            raise ValueError('address_bytes must be a valid bytes object')
+        if not isinstance(address_bytes, str):
+            raise ValueError(u'address_bytes must be a valid bytes object')
 
-        if not isinstance(memorysize_bytes, bytes):
-            raise ValueError('memorysize_bytes must be a valid bytes object')
+        if not isinstance(memorysize_bytes, str):
+            raise ValueError(u'memorysize_bytes must be a valid bytes object')
 
         if len(address_bytes) > 5:
-            raise ValueError('Address must be at most 40 bits long')
+            raise ValueError(u'Address must be at most 40 bits long')
 
         if len(memorysize_bytes) > 4:
-            raise ValueError('Memory size must be at most 32 bits long')
+            raise ValueError(u'Memory size must be at most 32 bits long')
 
-        address_bytes_padded = b'\x00' * (8-len(address_bytes)) + address_bytes
-        memorysize_bytes_padded = b'\x00' * (8-len(memorysize_bytes)) + memorysize_bytes
+        address_bytes_padded = '\x00' * (8-len(address_bytes)) + address_bytes
+        memorysize_bytes_padded = '\x00' * (8-len(memorysize_bytes)) + memorysize_bytes
 
-        address = struct.unpack('>q', address_bytes_padded)[0]
-        memorysize = struct.unpack('>q', memorysize_bytes_padded)[0]
+        address = struct.unpack(u'>q', address_bytes_padded)[0]
+        memorysize = struct.unpack(u'>q', memorysize_bytes_padded)[0]
         address_format = len(address_bytes) * 8
         memorysize_format = len(memorysize_bytes) * 8
 
         return cls(address=address, memorysize=memorysize, address_format=address_format, memorysize_format=memorysize_format)
 
     def __str__(self):
-        return 'Address=0x%x (%d bits), Size=0x%x (%d bits)' % (self.address, self.alfid.address_format, self.memorysize, self.alfid.memorysize_format)
+        return u'Address=0x%x (%d bits), Size=0x%x (%d bits)' % (self.address, self.alfid.address_format, self.memorysize, self.alfid.memorysize_format)
 
     def __repr__(self):
-        return '<%s: %s at 0x%08x>' % (self.__class__.__name__, str(self), id(self))
+        return u'<%s: %s at 0x%08x>' % (self.__class__.__name__, unicode(self), id(self))
 
-class DataFormatIdentifier:
-    """
+class DataFormatIdentifier(object):
+    u"""
     Defines the compression and encryption method of a specific chunk of data. 
     Mainly used by the :ref:`RequestUpload<RequestUpload>` and :ref:`RequestDownload<RequestDownload>` services
 
@@ -471,11 +482,11 @@ class DataFormatIdentifier:
     def __init__(self, compression=0, encryption=0):
         both = (compression, encryption)
         for param in both:
-            if not isinstance(param, int):
-                raise ValueError('compression and encryption method must be an integer value')
+            if not isinstance(param, (int, long)):
+                raise ValueError(u'compression and encryption method must be an integer value')
 
             if param < 0 or param > 0xF:
-                raise ValueError('compression and encryption method must each be an integer between 0 and 0xF')
+                raise ValueError(u'compression and encryption method must each be an integer between 0 and 0xF')
 
         self.compression = compression
         self.encryption = encryption
@@ -489,19 +500,19 @@ class DataFormatIdentifier:
         return ((self.compression & 0xF) << 4) | (self.encryption & 0xF)
 
     def get_byte(self):
-        return struct.pack('B', self.get_byte_as_int())
+        return struct.pack(u'B', self.get_byte_as_int())
 
     def __str__(self):
-        return 'Compression:0x%x, Encryption:0x%x' % (self.compression, self.encryption)
+        return u'Compression:0x%x, Encryption:0x%x' % (self.compression, self.encryption)
 
     def __repr__(self):
-        return '<%s: %s at 0x%08x>' % (self.__class__.__name__, str(self), id(self))
+        return u'<%s: %s at 0x%08x>' % (self.__class__.__name__, unicode(self), id(self))
 
 # Units defined in standard. Nowhere does the ISO-14229 make use of them, but they are defined
-class Units:
+class Units(object):
     #As defined in ISO-14229:2006 Annex C
-    class Prefixs:
-        class Prefix:
+    class Prefixs(object):
+        class Prefix(object):
             def __init__(self, id, name, symbol, description=None):
                 self.name = name
                 self.id = id
@@ -512,26 +523,26 @@ class Units:
                 return self.name
 
             def __repr__(self):
-                desc = "(%s) " % self.description if self.description is not None else ""
-                return "<UDS Unit prefix : %s[%s] %swith ID=%d at %08x>" % (self.name, self.symbol, desc, self.id, id(self))
-        exa		= Prefix(id=0x40, name= 'exa', 	symbol='E', description='10e18')
-        peta	= Prefix(id=0x41, name= 'peta', symbol='P', description='10e15')
-        tera	= Prefix(id=0x42, name= 'tera', symbol='T', description='10e12')
-        giga	= Prefix(id=0x43, name= 'giga', symbol='G', description='10e9')
-        mega	= Prefix(id=0x44, name= 'mega', symbol='M', description='10e6')
-        kilo	= Prefix(id=0x45, name= 'kilo', symbol='k', description='10e3')
-        hecto	= Prefix(id=0x46, name= 'hecto', symbol='h', description='10e2')
-        deca	= Prefix(id=0x47, name= 'deca', symbol='da', description='10e1')
-        deci	= Prefix(id=0x48, name= 'deci', symbol='d', description='10e-1')
-        centi	= Prefix(id=0x49, name= 'centi', symbol='c', description='10e-2')
-        milli	= Prefix(id=0x4A, name= 'milli', symbol='m', description='10e-3')
-        micro	= Prefix(id=0x4B, name= 'micro', symbol='m', description='10e-6')
-        nano	= Prefix(id=0x4C, name= 'nano', symbol='n', description='10e-9')
-        pico	= Prefix(id=0x4D, name= 'pico', symbol='p', description='10e-12')
-        femto	= Prefix(id=0x4E, name= 'femto', symbol='f', description='10e-15')
-        atto	= Prefix(id=0x4F, name= 'atto', symbol='a', description='10e-18')
+                desc = u"(%s) " % self.description if self.description is not None else u""
+                return u"<UDS Unit prefix : %s[%s] %swith ID=%d at %08x>" % (self.name, self.symbol, desc, self.id, id(self))
+        exa		= Prefix(id=0x40, name= u'exa', 	symbol=u'E', description=u'10e18')
+        peta	= Prefix(id=0x41, name= u'peta', symbol=u'P', description=u'10e15')
+        tera	= Prefix(id=0x42, name= u'tera', symbol=u'T', description=u'10e12')
+        giga	= Prefix(id=0x43, name= u'giga', symbol=u'G', description=u'10e9')
+        mega	= Prefix(id=0x44, name= u'mega', symbol=u'M', description=u'10e6')
+        kilo	= Prefix(id=0x45, name= u'kilo', symbol=u'k', description=u'10e3')
+        hecto	= Prefix(id=0x46, name= u'hecto', symbol=u'h', description=u'10e2')
+        deca	= Prefix(id=0x47, name= u'deca', symbol=u'da', description=u'10e1')
+        deci	= Prefix(id=0x48, name= u'deci', symbol=u'd', description=u'10e-1')
+        centi	= Prefix(id=0x49, name= u'centi', symbol=u'c', description=u'10e-2')
+        milli	= Prefix(id=0x4A, name= u'milli', symbol=u'm', description=u'10e-3')
+        micro	= Prefix(id=0x4B, name= u'micro', symbol=u'm', description=u'10e-6')
+        nano	= Prefix(id=0x4C, name= u'nano', symbol=u'n', description=u'10e-9')
+        pico	= Prefix(id=0x4D, name= u'pico', symbol=u'p', description=u'10e-12')
+        femto	= Prefix(id=0x4E, name= u'femto', symbol=u'f', description=u'10e-15')
+        atto	= Prefix(id=0x4F, name= u'atto', symbol=u'a', description=u'10e-18')
 
-    class Unit:
+    class Unit(object):
         def __init__(self, id, name, symbol, description=None):
             self.id =id
             self.name = name
@@ -543,88 +554,88 @@ class Units:
             return self.name
 
         def __repr__(self):
-            desc = "(unit of %s) " % self.description if self.description is not None else ""
-            return "<UDS Unit : %s[%s] %swith ID=%d at %08x>" % (self.name, self.symbol, desc, self.id, id(self))
+            desc = u"(unit of %s) " % self.description if self.description is not None else u""
+            return u"<UDS Unit : %s[%s] %swith ID=%d at %08x>" % (self.name, self.symbol, desc, self.id, id(self))
 
-    no_unit 			= Unit(id=0x00, name= 'no unit', 					symbol='-', 		description='-')
-    meter 				= Unit(id=0x01, name= 'meter', 						symbol='m', 		description='length')
-    foor 				= Unit(id=0x02, name= 'foot', 						symbol='ft', 		description='length')
-    inch				= Unit(id=0x03, name= 'inch', 						symbol='in', 		description='length')
-    yard				= Unit(id=0x04, name= 'yard', 						symbol='yd', 		description='length')
-    english_mile		= Unit(id=0x05, name= 'mile (English)',				symbol='mi', 		description='length')
-    gram				= Unit(id=0x06, name= 'gram', 						symbol='g', 		description='mass')
-    metric_ton			= Unit(id=0x07, name= 'ton (metric)', 				symbol='t', 		description='mass')
-    second				= Unit(id=0x08, name= 'second', 					symbol='s', 		description='time')
-    minute				= Unit(id=0x09, name= 'minute', 					symbol='min', 		description='time')
-    hour				= Unit(id=0x0A, name= 'hour', 						symbol='h', 		description='time')
-    day					= Unit(id=0x0B, name= 'day', 						symbol='d', 		description='time')
-    year				= Unit(id=0x0C, name= 'year', 						symbol='y', 		description='time')
-    ampere				= Unit(id=0x0D, name= 'ampere', 					symbol='A', 		description='current')
-    volt				= Unit(id=0x0E, name= 'volt', 						symbol='V', 		description='voltage')
-    coulomb				= Unit(id=0x0F, name= 'coulomb', 					symbol='C', 		description='electric charge')
-    ohm					= Unit(id=0x10, name= 'ohm', 						symbol='W', 		description='resistance')
-    farad				= Unit(id=0x11, name= 'farad', 						symbol='F', 		description='capacitance')
-    henry				= Unit(id=0x12, name= 'henry', 						symbol='H', 		description='inductance')
-    siemens				= Unit(id=0x13, name= 'siemens', 					symbol='S', 		description='electric conductance')
-    weber				= Unit(id=0x14, name= 'weber', 						symbol='Wb', 		description='magnetic flux')
-    tesla				= Unit(id=0x15, name= 'tesla', 						symbol='T', 		description='magnetic flux density')
-    kelvin				= Unit(id=0x16, name= 'kelvin', 					symbol='K', 		description='thermodynamic temperature')
-    Celsius				= Unit(id=0x17, name= 'Celsius', 					symbol='°C', 		description='thermodynamic temperature')
-    Fahrenheit			= Unit(id=0x18, name= 'Fahrenheit', 				symbol='°F', 		description='thermodynamic temperature')
-    candela				= Unit(id=0x19, name= 'candela', 					symbol='cd', 		description='luminous intensity')
-    radian				= Unit(id=0x1A, name= 'radian', 					symbol='rad', 		description='plane angle')
-    degree				= Unit(id=0x1B, name= 'degree', 					symbol='°', 		description='plane angle')
-    hertz				= Unit(id=0x1C, name= 'hertz', 						symbol='Hz', 		description='frequency')
-    joule				= Unit(id=0x1D, name= 'joule', 						symbol='J', 		description='energy')
-    Newton				= Unit(id=0x1E, name= 'Newton', 					symbol='N', 		description='force')
-    kilopond			= Unit(id=0x1F, name= 'kilopond', 					symbol='kp', 		description='force')
-    pound				= Unit(id=0x20, name= 'pound force', 				symbol='lbf', 		description='force')
-    watt				= Unit(id=0x21, name= 'watt', 						symbol='W', 		description='power')
-    horse				= Unit(id=0x22, name= 'horse power (metric)', 		symbol='hk', 		description='power')
-    horse				= Unit(id=0x23, name= 'horse power(UK and US)', 	symbol='hp', 		description='power')
-    Pascal				= Unit(id=0x24, name= 'Pascal', 					symbol='Pa', 		description='pressure')
-    bar					= Unit(id=0x25, name= 'bar', 						symbol='bar', 		description='pressure')
-    atmosphere			= Unit(id=0x26, name= 'atmosphere', 				symbol='atm', 		description='pressure')
-    psi					= Unit(id=0x27, name= 'pound force per square inch',symbol='psi', 		description='pressure')
-    becqerel			= Unit(id=0x28, name= 'becqerel', 					symbol='Bq', 		description='radioactivity')
-    lumen				= Unit(id=0x29, name= 'lumen', 						symbol='lm', 		description='light flux')
-    lux					= Unit(id=0x2A, name= 'lux', 						symbol='lx', 		description='illuminance')
-    liter				= Unit(id=0x2B, name= 'liter', 						symbol='l', 		description='volume')
-    gallon				= Unit(id=0x2C, name= 'gallon (British)', 			symbol='-', 		description='volume')
-    gallon				= Unit(id=0x2D, name= 'gallon (US liq)', 			symbol='-', 		description='volume')
-    cubic				= Unit(id=0x2E, name= 'cubic inch', 				symbol='cu in', 	description='volume')
-    meter_per_sec		= Unit(id=0x2F, name= 'meter per seconds', 			symbol='m/s', 		description='speed')
-    kmh					= Unit(id=0x30, name= 'kilometre per hour',			symbol='km/h', 		description='speed')
-    mph					= Unit(id=0x31, name= 'mile per hour', 				symbol='mph', 		description='speed')
-    rps					= Unit(id=0x32, name= 'revolutions per second', 	symbol='rps', 		description='angular velocity')
-    rpm					= Unit(id=0x33, name= 'revolutions per minute', 	symbol='rpm', 		description='angular velocity')
-    counts				= Unit(id=0x34, name= 'counts', 					symbol='-', 		description='-')
-    percent				= Unit(id=0x35, name= 'percent', 					symbol='%', 		description='-')
-    mg_per_stroke		= Unit(id=0x36, name= 'milligram per stroke', 		symbol='mg/stroke', description='mass per engine stroke')
-    meter_per_sec2		= Unit(id=0x37, name= 'meter per square seconds', 	symbol='m/s2', 		description='acceleration')
-    Nm					= Unit(id=0x38, name= 'Newton meter', 				symbol='Nm', 		description='moment')
-    liter_per_min		= Unit(id=0x39, name= 'liter per minute', 			symbol='l/min', 	description='flow')
-    watt_per_meter2		= Unit(id=0x3A, name= 'watt per square meter', 		symbol='W/m2', 		description='intensity')
-    bar_per_sec			= Unit(id=0x3B, name= 'bar per second', 			symbol='bar/s', 	description='pressure change')
-    radians_per_sec		= Unit(id=0x3C, name= 'radians per second', 		symbol='rad/s', 	description='angular velocity')
-    radians				= Unit(id=0x3D, name= 'radians square second', 		symbol='rad/s2', 	description='angular acceleration')
-    kilogram_per_meter2	= Unit(id=0x3E, name= 'kilogram per square meter', 	symbol='kg/m2', 	description='-')
-    date1 				= Unit(id=0x50, name='Date1', 						symbol='-', 		description = 'Year-Month-Day')
-    date2 				= Unit(id=0x51, name='Date2', 						symbol='-', 		description = 'Day/Month/Year')
-    date3 				= Unit(id=0x52, name='Date3', 						symbol='-', 		description = 'Month/Day/Year')
-    week 				= Unit(id=0x53, name='week', 						symbol='W', 		description = 'calendar week')
-    time1 				= Unit(id=0x54, name='Time1', 						symbol='-', 		description = 'UTC Hour/Minute/Second')
-    time2 				= Unit(id=0x55, name='Time2', 						symbol='-', 		description = 'Hour/Minute/Second')
-    datetime1 			= Unit(id=0x56, name='DateAndTime1', 				symbol='-', 		description = 'Second/Minute/Hour/Day/Month/Year')
-    datetime2 			= Unit(id=0x57, name='DateAndTime2', 				symbol='-', 		description = 'Second/Minute/Hour/Day/Month/Year/Local minute offset/Localhour offset')
-    datetime3 			= Unit(id=0x58, name='DateAndTime3', 				symbol='-', 		description = 'Second/Minute/Hour/Month/Day/Year')
-    datetime4 			= Unit(id=0x59, name='DateAndTime4', 				symbol='-', 		description = 'Second/Minute/Hour/Month/Day/Year/Local minute offset/Localhour offset')
+    no_unit 			= Unit(id=0x00, name= u'no unit', 					symbol=u'-', 		description=u'-')
+    meter 				= Unit(id=0x01, name= u'meter', 						symbol=u'm', 		description=u'length')
+    foor 				= Unit(id=0x02, name= u'foot', 						symbol=u'ft', 		description=u'length')
+    inch				= Unit(id=0x03, name= u'inch', 						symbol=u'in', 		description=u'length')
+    yard				= Unit(id=0x04, name= u'yard', 						symbol=u'yd', 		description=u'length')
+    english_mile		= Unit(id=0x05, name= u'mile (English)',				symbol=u'mi', 		description=u'length')
+    gram				= Unit(id=0x06, name= u'gram', 						symbol=u'g', 		description=u'mass')
+    metric_ton			= Unit(id=0x07, name= u'ton (metric)', 				symbol=u't', 		description=u'mass')
+    second				= Unit(id=0x08, name= u'second', 					symbol=u's', 		description=u'time')
+    minute				= Unit(id=0x09, name= u'minute', 					symbol=u'min', 		description=u'time')
+    hour				= Unit(id=0x0A, name= u'hour', 						symbol=u'h', 		description=u'time')
+    day					= Unit(id=0x0B, name= u'day', 						symbol=u'd', 		description=u'time')
+    year				= Unit(id=0x0C, name= u'year', 						symbol=u'y', 		description=u'time')
+    ampere				= Unit(id=0x0D, name= u'ampere', 					symbol=u'A', 		description=u'current')
+    volt				= Unit(id=0x0E, name= u'volt', 						symbol=u'V', 		description=u'voltage')
+    coulomb				= Unit(id=0x0F, name= u'coulomb', 					symbol=u'C', 		description=u'electric charge')
+    ohm					= Unit(id=0x10, name= u'ohm', 						symbol=u'W', 		description=u'resistance')
+    farad				= Unit(id=0x11, name= u'farad', 						symbol=u'F', 		description=u'capacitance')
+    henry				= Unit(id=0x12, name= u'henry', 						symbol=u'H', 		description=u'inductance')
+    siemens				= Unit(id=0x13, name= u'siemens', 					symbol=u'S', 		description=u'electric conductance')
+    weber				= Unit(id=0x14, name= u'weber', 						symbol=u'Wb', 		description=u'magnetic flux')
+    tesla				= Unit(id=0x15, name= u'tesla', 						symbol=u'T', 		description=u'magnetic flux density')
+    kelvin				= Unit(id=0x16, name= u'kelvin', 					symbol=u'K', 		description=u'thermodynamic temperature')
+    Celsius				= Unit(id=0x17, name= u'Celsius', 					symbol=u'°C', 		description=u'thermodynamic temperature')
+    Fahrenheit			= Unit(id=0x18, name= u'Fahrenheit', 				symbol=u'°F', 		description=u'thermodynamic temperature')
+    candela				= Unit(id=0x19, name= u'candela', 					symbol=u'cd', 		description=u'luminous intensity')
+    radian				= Unit(id=0x1A, name= u'radian', 					symbol=u'rad', 		description=u'plane angle')
+    degree				= Unit(id=0x1B, name= u'degree', 					symbol=u'°', 		description=u'plane angle')
+    hertz				= Unit(id=0x1C, name= u'hertz', 						symbol=u'Hz', 		description=u'frequency')
+    joule				= Unit(id=0x1D, name= u'joule', 						symbol=u'J', 		description=u'energy')
+    Newton				= Unit(id=0x1E, name= u'Newton', 					symbol=u'N', 		description=u'force')
+    kilopond			= Unit(id=0x1F, name= u'kilopond', 					symbol=u'kp', 		description=u'force')
+    pound				= Unit(id=0x20, name= u'pound force', 				symbol=u'lbf', 		description=u'force')
+    watt				= Unit(id=0x21, name= u'watt', 						symbol=u'W', 		description=u'power')
+    horse				= Unit(id=0x22, name= u'horse power (metric)', 		symbol=u'hk', 		description=u'power')
+    horse				= Unit(id=0x23, name= u'horse power(UK and US)', 	symbol=u'hp', 		description=u'power')
+    Pascal				= Unit(id=0x24, name= u'Pascal', 					symbol=u'Pa', 		description=u'pressure')
+    bar					= Unit(id=0x25, name= u'bar', 						symbol=u'bar', 		description=u'pressure')
+    atmosphere			= Unit(id=0x26, name= u'atmosphere', 				symbol=u'atm', 		description=u'pressure')
+    psi					= Unit(id=0x27, name= u'pound force per square inch',symbol=u'psi', 		description=u'pressure')
+    becqerel			= Unit(id=0x28, name= u'becqerel', 					symbol=u'Bq', 		description=u'radioactivity')
+    lumen				= Unit(id=0x29, name= u'lumen', 						symbol=u'lm', 		description=u'light flux')
+    lux					= Unit(id=0x2A, name= u'lux', 						symbol=u'lx', 		description=u'illuminance')
+    liter				= Unit(id=0x2B, name= u'liter', 						symbol=u'l', 		description=u'volume')
+    gallon				= Unit(id=0x2C, name= u'gallon (British)', 			symbol=u'-', 		description=u'volume')
+    gallon				= Unit(id=0x2D, name= u'gallon (US liq)', 			symbol=u'-', 		description=u'volume')
+    cubic				= Unit(id=0x2E, name= u'cubic inch', 				symbol=u'cu in', 	description=u'volume')
+    meter_per_sec		= Unit(id=0x2F, name= u'meter per seconds', 			symbol=u'm/s', 		description=u'speed')
+    kmh					= Unit(id=0x30, name= u'kilometre per hour',			symbol=u'km/h', 		description=u'speed')
+    mph					= Unit(id=0x31, name= u'mile per hour', 				symbol=u'mph', 		description=u'speed')
+    rps					= Unit(id=0x32, name= u'revolutions per second', 	symbol=u'rps', 		description=u'angular velocity')
+    rpm					= Unit(id=0x33, name= u'revolutions per minute', 	symbol=u'rpm', 		description=u'angular velocity')
+    counts				= Unit(id=0x34, name= u'counts', 					symbol=u'-', 		description=u'-')
+    percent				= Unit(id=0x35, name= u'percent', 					symbol=u'%', 		description=u'-')
+    mg_per_stroke		= Unit(id=0x36, name= u'milligram per stroke', 		symbol=u'mg/stroke', description=u'mass per engine stroke')
+    meter_per_sec2		= Unit(id=0x37, name= u'meter per square seconds', 	symbol=u'm/s2', 		description=u'acceleration')
+    Nm					= Unit(id=0x38, name= u'Newton meter', 				symbol=u'Nm', 		description=u'moment')
+    liter_per_min		= Unit(id=0x39, name= u'liter per minute', 			symbol=u'l/min', 	description=u'flow')
+    watt_per_meter2		= Unit(id=0x3A, name= u'watt per square meter', 		symbol=u'W/m2', 		description=u'intensity')
+    bar_per_sec			= Unit(id=0x3B, name= u'bar per second', 			symbol=u'bar/s', 	description=u'pressure change')
+    radians_per_sec		= Unit(id=0x3C, name= u'radians per second', 		symbol=u'rad/s', 	description=u'angular velocity')
+    radians				= Unit(id=0x3D, name= u'radians square second', 		symbol=u'rad/s2', 	description=u'angular acceleration')
+    kilogram_per_meter2	= Unit(id=0x3E, name= u'kilogram per square meter', 	symbol=u'kg/m2', 	description=u'-')
+    date1 				= Unit(id=0x50, name=u'Date1', 						symbol=u'-', 		description = u'Year-Month-Day')
+    date2 				= Unit(id=0x51, name=u'Date2', 						symbol=u'-', 		description = u'Day/Month/Year')
+    date3 				= Unit(id=0x52, name=u'Date3', 						symbol=u'-', 		description = u'Month/Day/Year')
+    week 				= Unit(id=0x53, name=u'week', 						symbol=u'W', 		description = u'calendar week')
+    time1 				= Unit(id=0x54, name=u'Time1', 						symbol=u'-', 		description = u'UTC Hour/Minute/Second')
+    time2 				= Unit(id=0x55, name=u'Time2', 						symbol=u'-', 		description = u'Hour/Minute/Second')
+    datetime1 			= Unit(id=0x56, name=u'DateAndTime1', 				symbol=u'-', 		description = u'Second/Minute/Hour/Day/Month/Year')
+    datetime2 			= Unit(id=0x57, name=u'DateAndTime2', 				symbol=u'-', 		description = u'Second/Minute/Hour/Day/Month/Year/Local minute offset/Localhour offset')
+    datetime3 			= Unit(id=0x58, name=u'DateAndTime3', 				symbol=u'-', 		description = u'Second/Minute/Hour/Month/Day/Year')
+    datetime4 			= Unit(id=0x59, name=u'DateAndTime4', 				symbol=u'-', 		description = u'Second/Minute/Hour/Month/Day/Year/Local minute offset/Localhour offset')
 
 
 # Routine class that containes few definitions for usage with nice syntax.
 # myRoutine = Routine.EraseMemory    or    print(Routine.name_from_id(myRoutine))
-class Routine:
-    """
+class Routine(object):
+    u"""
     Defines a list of constants that are routine identifiers defined by the UDS standard.
     This class provides no functionality apart from defining these constants
     """
@@ -637,36 +648,36 @@ class Routine:
     @classmethod
     def name_from_id(cls, routine_id):
         # Helper to print the type of requests (logging purpose) as defined by ISO-14229:2006, Annex F
-        if not isinstance(routine_id, int) or routine_id < 0 or routine_id > 0xFFFF:
-            raise ValueError('Routine ID must be a valid integer between 0 and 0xFFFF')
+        if not isinstance(routine_id, (int, long)) or routine_id < 0 or routine_id > 0xFFFF:
+            raise ValueError(u'Routine ID must be a valid integer between 0 and 0xFFFF')
 
         if routine_id >= 0x0000 and routine_id <= 0x00FF:
-            return 'ISOSAEReserved'
+            return u'ISOSAEReserved'
         if routine_id >= 0x0100 and routine_id <= 0x01FF:
-            return 'TachographTestIds'
+            return u'TachographTestIds'
         if routine_id >= 0x0200 and routine_id <= 0xDFFF:
-            return 'VehicleManufacturerSpecific'
+            return u'VehicleManufacturerSpecific'
         if routine_id >= 0xE000 and routine_id <= 0xE1FF:
-            return 'OBDTestIds'
+            return u'OBDTestIds'
         if routine_id == 0xE200:
-            return 'DeployLoopRoutineID'
+            return u'DeployLoopRoutineID'
         if routine_id >= 0xE201 and routine_id <= 0xE2FF:
-            return 'SafetySystemRoutineIDs'
+            return u'SafetySystemRoutineIDs'
         if routine_id >= 0xE300 and routine_id <= 0xEFFF:
-            return 'ISOSAEReserved'
+            return u'ISOSAEReserved'
         if routine_id >= 0xF000 and routine_id <= 0xFEFF:
-            return 'SystemSupplierSpecific'
+            return u'SystemSupplierSpecific'
         if routine_id == 0xFF00:
-            return 'EraseMemory'
+            return u'EraseMemory'
         if routine_id == 0xFF01:
-            return 'CheckProgrammingDependencies'
+            return u'CheckProgrammingDependencies'
         if routine_id == 0xFF02:
-            return 'EraseMirrorMemoryDTCs'
+            return u'EraseMirrorMemoryDTCs'
         if routine_id >= 0xFF03 and routine_id <= 0xFFFF:
-            return 'ISOSAEReserved'
+            return u'ISOSAEReserved'
 
-class DataIdentifier:
-    """
+class DataIdentifier(object):
+    u"""
     Defines a list of constants that are data identifiers defined by the UDS standard.
     This class provides no functionality apart from defining these constants
     """
@@ -707,122 +718,122 @@ class DataIdentifier:
     @classmethod
     def name_from_id(cls, did):
         #As defined by ISO-14229:2006, Annex F
-        if not isinstance(did, int) or did < 0 or did > 0xFFFF:
-            raise ValueError('Data IDentifier must be a valid integer between 0 and 0xFFFF')
+        if not isinstance(did, (int, long)) or did < 0 or did > 0xFFFF:
+            raise ValueError(u'Data IDentifier must be a valid integer between 0 and 0xFFFF')
 
         if did >= 0x0000 and did <= 0x00FF:
-            return 'ISOSAEReserved'
+            return u'ISOSAEReserved'
         if did >= 0x0100 and did <= 0xEFFF:
-            return 'VehicleManufacturerSpecific'
+            return u'VehicleManufacturerSpecific'
         if did >= 0xF000 and did <= 0xF00F:
-            return 'NetworkConfigurationDataForTractorTrailerApplicationDataIdentifier'
+            return u'NetworkConfigurationDataForTractorTrailerApplicationDataIdentifier'
         if did >= 0xF010 and did <= 0xF0FF:
-            return 'VehicleManufacturerSpecific'
+            return u'VehicleManufacturerSpecific'
         if did >= 0xF100 and did <= 0xF17F:
-            return 'IdentificationOptionVehicleManufacturerSpecificDataIdentifier'
+            return u'IdentificationOptionVehicleManufacturerSpecificDataIdentifier'
 
         if did == 0xF180:
-            return 'BootSoftwareIdentificationDataIdentifier'
+            return u'BootSoftwareIdentificationDataIdentifier'
         if did == 0xF181:
-            return 'ApplicationSoftwareIdentificationDataIdentifier'
+            return u'ApplicationSoftwareIdentificationDataIdentifier'
         if did == 0xF182:
-            return 'ApplicationDataIdentificationDataIdentifier'
+            return u'ApplicationDataIdentificationDataIdentifier'
         if did == 0xF183:
-            return 'BootSoftwareFingerprintDataIdentifier'
+            return u'BootSoftwareFingerprintDataIdentifier'
         if did == 0xF184:
-            return 'ApplicationSoftwareFingerprintDataIdentifier'
+            return u'ApplicationSoftwareFingerprintDataIdentifier'
         if did == 0xF185:
-            return 'ApplicationDataFingerprintDataIdentifier'
+            return u'ApplicationDataFingerprintDataIdentifier'
         if did == 0xF186:
-            return 'ActiveDiagnosticSessionDataIdentifier'
+            return u'ActiveDiagnosticSessionDataIdentifier'
         if did == 0xF187:
-            return 'VehicleManufacturerSparePartNumberDataIdentifier'
+            return u'VehicleManufacturerSparePartNumberDataIdentifier'
         if did == 0xF188:
-            return 'VehicleManufacturerECUSoftwareNumberDataIdentifier'
+            return u'VehicleManufacturerECUSoftwareNumberDataIdentifier'
         if did == 0xF188:
-            return 'VehicleManufacturerECUSoftwareNumberDataIdentifier'
+            return u'VehicleManufacturerECUSoftwareNumberDataIdentifier'
         if did == 0xF189:
-            return 'VehicleManufacturerECUSoftwareVersionNumberDataIdentifier'
+            return u'VehicleManufacturerECUSoftwareVersionNumberDataIdentifier'
         if did == 0xF18A:
-            return 'SystemSupplierIdentifierDataIdentifier'
+            return u'SystemSupplierIdentifierDataIdentifier'
         if did == 0xF18B:
-            return 'ECUManufacturingDateDataIdentifier'
+            return u'ECUManufacturingDateDataIdentifier'
         if did == 0xF18C:
-            return 'ECUSerialNumberDataIdentifier'
+            return u'ECUSerialNumberDataIdentifier'
         if did == 0xF18D:
-            return 'SupportedFunctionalUnitsDataIdentifier'
+            return u'SupportedFunctionalUnitsDataIdentifier'
         if did == 0xF18E:
-            return 'VehicleManufacturerKitAssemblyPartNumberDataIdentifier'
+            return u'VehicleManufacturerKitAssemblyPartNumberDataIdentifier'
         if did == 0xF18F:
-            return 'ISOSAEReservedStandardized'
+            return u'ISOSAEReservedStandardized'
         if did == 0xF190:
-            return 'VINDataIdentifier'
+            return u'VINDataIdentifier'
         if did == 0xF191:
-            return 'VehicleManufacturerECUHardwareNumberDataIdentifier'
+            return u'VehicleManufacturerECUHardwareNumberDataIdentifier'
         if did == 0xF192:
-            return 'SystemSupplierECUHardwareNumberDataIdentifier'
+            return u'SystemSupplierECUHardwareNumberDataIdentifier'
         if did == 0xF193:
-            return 'SystemSupplierECUHardwareVersionNumberDataIdentifier'
+            return u'SystemSupplierECUHardwareVersionNumberDataIdentifier'
         if did == 0xF194:
-            return 'SystemSupplierECUSoftwareNumberDataIdentifier'
+            return u'SystemSupplierECUSoftwareNumberDataIdentifier'
         if did == 0xF195:
-            return 'SystemSupplierECUSoftwareVersionNumberDataIdentifier'
+            return u'SystemSupplierECUSoftwareVersionNumberDataIdentifier'
         if did == 0xF196:
-            return 'ExhaustRegulationOrTypeApprovalNumberDataIdentifier'
+            return u'ExhaustRegulationOrTypeApprovalNumberDataIdentifier'
         if did == 0xF197:
-            return 'SystemNameOrEngineTypeDataIdentifier'
+            return u'SystemNameOrEngineTypeDataIdentifier'
         if did == 0xF198:
-            return 'RepairShopCodeOrTesterSerialNumberDataIdentifier'
+            return u'RepairShopCodeOrTesterSerialNumberDataIdentifier'
         if did == 0xF199:
-            return 'ProgrammingDateDataIdentifier'
+            return u'ProgrammingDateDataIdentifier'
         if did == 0xF19A:
-            return 'CalibrationRepairShopCodeOrCalibrationEquipmentSerialNumberDataIdentifier'
+            return u'CalibrationRepairShopCodeOrCalibrationEquipmentSerialNumberDataIdentifier'
         if did == 0xF19B:
-            return 'CalibrationDateDataIdentifier'
+            return u'CalibrationDateDataIdentifier'
         if did == 0xF19C:
-            return 'CalibrationEquipmentSoftwareNumberDataIdentifier'
+            return u'CalibrationEquipmentSoftwareNumberDataIdentifier'
         if did == 0xF19D:
-            return 'ECUInstallationDateDataIdentifier'
+            return u'ECUInstallationDateDataIdentifier'
         if did == 0xF19E:
-            return 'ODXFileDataIdentifier'
+            return u'ODXFileDataIdentifier'
         if did == 0xF19F:
-            return 'EntityDataIdentifier'
+            return u'EntityDataIdentifier'
 
         if did >= 0xF1A0 and did <= 0xF1EF:
-            return 'IdentificationOptionVehicleManufacturerSpecific'
+            return u'IdentificationOptionVehicleManufacturerSpecific'
         if did >= 0xF1F0 and did <= 0xF1FF:
-            return 'IdentificationOptionSystemSupplierSpecific'
+            return u'IdentificationOptionSystemSupplierSpecific'
         if did >= 0xF200 and did <= 0xF2FF:
-            return 'PeriodicDataIdentifier'	
+            return u'PeriodicDataIdentifier'	
         if did >= 0xF300 and did <= 0xF3FF:
-            return 'DynamicallyDefinedDataIdentifier'
+            return u'DynamicallyDefinedDataIdentifier'
         if did >= 0xF400 and did <= 0xF4FF:
-            return 'OBDDataIdentifier'
+            return u'OBDDataIdentifier'
         if did >= 0xF500 and did <= 0xF5FF:
-            return 'OBDDataIdentifier'
+            return u'OBDDataIdentifier'
         if did >= 0xF600 and did <= 0xF6FF:
-            return 'OBDMonitorDataIdentifier'
+            return u'OBDMonitorDataIdentifier'
         if did >= 0xF700 and did <= 0xF7FF:
-            return 'OBDMonitorDataIdentifier'
+            return u'OBDMonitorDataIdentifier'
         if did >= 0xF800 and did <= 0xF8FF:
-            return 'OBDInfoTypeDataIdentifier'
+            return u'OBDInfoTypeDataIdentifier'
         if did >= 0xF900 and did <= 0xF9FF:
-            return 'TachographDataIdentifier'
+            return u'TachographDataIdentifier'
         if did >= 0xFA00 and did <= 0xFA0F:
-            return 'AirbagDeploymentDataIdentifier'
+            return u'AirbagDeploymentDataIdentifier'
         if did >= 0xFA10 and did <= 0xFAFF:
-            return 'SafetySystemDataIdentifier'
+            return u'SafetySystemDataIdentifier'
         if did >= 0xFB00 and did <= 0xFCFF:
-            return 'ReservedForLegislativeUse'
+            return u'ReservedForLegislativeUse'
         if did >= 0xFD00 and did <= 0xFEFF:
-            return 'SystemSupplierSpecific'
+            return u'SystemSupplierSpecific'
         if did >= 0xFF00 and did <= 0xFFFF:
-            return 'ISOSAEReserved'
+            return u'ISOSAEReserved'
 
 # Communication type is a single byte value including message type and subnet.
 # Used by CommunicationControl service and defined by ISO-14229:2006 Annex B, table B.1
-class CommunicationType:
-    """
+class CommunicationType(object):
+    u"""
     This class represents a pair of subnet and message types. This value is mainly used by the :ref:`CommunicationControl<CommunicationControl>` service
 
     :param subnet: Represent the subnet number. Value ranges from 0 to 0xF 
@@ -835,16 +846,16 @@ class CommunicationType:
     :type network_management_msg: bool
 
     """
-    class Subnet:
+    class Subnet(object):
         node = 0
         network = 0xF
 
         def __init__(self, subnet):
-            if not isinstance(subnet, int):
-                raise ValueError('subnet must be an integer value')
+            if not isinstance(subnet, (int, long)):
+                raise ValueError(u'subnet must be an integer value')
 
             if subnet < 0 or subnet > 0xF:
-                raise ValueError('subnet must be an integer between 0 and 0xF')
+                raise ValueError(u'subnet must be an integer between 0 and 0xF')
 
             self.subnet=subnet
 
@@ -857,10 +868,10 @@ class CommunicationType:
             subnet = self.Subnet(subnet)
 
         if not isinstance(normal_msg, bool) or not isinstance(network_management_msg, bool):
-            raise ValueError('message type (normal_msg, network_management_msg) must be valid boolean values')
+            raise ValueError(u'message type (normal_msg, network_management_msg) must be valid boolean values')
 
         if normal_msg == False and network_management_msg == False:
-            raise ValueError('At least one message type must be controlled')
+            raise ValueError(u'At least one message type must be controlled')
 
         self.subnet = subnet
         self.normal_msg = normal_msg
@@ -877,12 +888,12 @@ class CommunicationType:
         return byte
 
     def get_byte(self):
-        return struct.pack('B', self.get_byte_as_int())
+        return struct.pack(u'B', self.get_byte_as_int())
 
     @classmethod
     def from_byte(cls, val):
-        if isinstance(val, bytes):
-            val = struct.unpack('B', val)[0]
+        if isinstance(val, str):
+            val = struct.unpack(u'B', val)[0]
         val = int(val)
         subnet = (val & 0xF0) >> 4
         normal_msg = True if val & 1 > 0 else False
@@ -892,18 +903,18 @@ class CommunicationType:
     def __str__(self):
         flags = []
         if self.normal_msg:
-            flags.append('NormalMsg')
+            flags.append(u'NormalMsg')
 
         if self.network_management_msg:
-            flags.append('NetworkManagementMsg')
+            flags.append(u'NetworkManagementMsg')
 
-        return 'subnet=0x%x. Flags : [%s]' % (self.subnet.value(), ','.join(flags))
+        return u'subnet=0x%x. Flags : [%s]' % (self.subnet.value(), u','.join(flags))
 
     def __repr__(self):
-        return '<%s: %s at 0x%08x>' % (self.__class__.__name__, str(self), id(self))
+        return u'<%s: %s at 0x%08x>' % (self.__class__.__name__, unicode(self), id(self))
 
-class Baudrate:
-    """
+class Baudrate(object):
+    u"""
     Represents a link speed in bit per seconds (or symbol per seconds to be more accurate).
     This class is used by the :ref:`LinkControl<LinkControl>` service that controls the underlying protocol speeds.
 
@@ -939,7 +950,7 @@ class Baudrate:
     1000000 : 0x13,
     }
 
-    class Type:
+    class Type(object):
         Fixed = 0		# When baudrate is a predefined value from standard
         Specific = 1	# When using custom baudrate
         Identifier = 2  # Baudrate implied by baudrate ID
@@ -947,11 +958,11 @@ class Baudrate:
 
     # User can specify the type of baudrate or let this class guess what he wants (this adds some simplicity for non-experts).
     def __init__(self, baudrate, baudtype=Type.Auto):
-        if not isinstance(baudrate, int):
-            raise ValueError('baudrate must be an integer')
+        if not isinstance(baudrate, (int, long)):
+            raise ValueError(u'baudrate must be an integer')
 
         if baudrate < 0:
-            raise ValueError('baudrate must be an integer greater than 0')
+            raise ValueError(u'baudrate must be an integer greater than 0')
 
         if baudtype == self.Type.Auto:
             if baudrate in self.baudrate_map:
@@ -966,23 +977,23 @@ class Baudrate:
 
         if self.baudtype == self.Type.Specific:
             if baudrate > 0xFFFFFF:
-                raise ValueError('Baudrate value cannot be bigger than a 24 bits value.')
+                raise ValueError(u'Baudrate value cannot be bigger than a 24 bits value.')
 
         elif self.baudtype == self.Type.Identifier:
             if baudrate > 0xFF:
-                raise ValueError('Baudrate ID must be an integer between 0 and 0xFF')
+                raise ValueError(u'Baudrate ID must be an integer between 0 and 0xFF')
         elif self.baudtype == self.Type.Fixed:
             if baudrate not in self.baudrate_map:
-                raise ValueError('baudrate must be part of the supported baudrate list defined by UDS standard')
+                raise ValueError(u'baudrate must be part of the supported baudrate list defined by UDS standard')
         else:
-            raise ValueError('Unknown baudtype : %s' % self.baudtype)
+            raise ValueError(u'Unknown baudtype : %s' % self.baudtype)
 
         self.baudrate = baudrate
 
     # internal helper to change the type of this baudrate
     def make_new_type(self, baudtype):
         if baudtype not in [self.Type.Fixed, self.Type.Specific]:
-            raise ValueError('Baudrate type can only be change to Fixed or Specific')
+            raise ValueError(u'Baudrate type can only be change to Fixed or Specific')
 
         return Baudrate(self.effective_baudrate(), baudtype=baudtype)
 
@@ -993,43 +1004,43 @@ class Baudrate:
                 if self.baudrate_map[k] == self.baudrate:
                     return k
 
-            raise RuntimeError('Unknown effective baudrate, this could indicate a bug')
+            raise RuntimeError(u'Unknown effective baudrate, this could indicate a bug')
         else:
             return self.baudrate
 
     # Encodes the baudrate value the way they are exchanged.
     def get_bytes(self):
         if self.baudtype == self.Type.Fixed:
-            return struct.pack('B', self.baudrate_map[self.baudrate])
+            return struct.pack(u'B', self.baudrate_map[self.baudrate])
 
         if self.baudtype == self.Type.Specific:
             b1 = (self.baudrate >> 16 ) & 0xFF
             b2 = (self.baudrate >> 8 ) & 0xFF
             b3 = (self.baudrate >> 0 ) & 0xFF
-            return struct.pack('BBB', b1, b2, b3)
+            return struct.pack(u'BBB', b1, b2, b3)
 
         if self.baudtype==self.Type.Identifier:
-            return struct.pack('B', self.baudrate)
+            return struct.pack(u'B', self.baudrate)
 
-        raise RuntimeError('Unknown baudrate baudtype : %s' % self.baudtype)
+        raise RuntimeError(u'Unknown baudrate baudtype : %s' % self.baudtype)
 
     def __str__(self):
-        baudtype_str = ''
+        baudtype_str = u''
         if self.baudtype == self.Type.Fixed:
-            baudtype_str = 'Fixed'
+            baudtype_str = u'Fixed'
         elif self.baudtype == self.Type.Specific:
-            baudtype_str = 'Specific'
+            baudtype_str = u'Specific'
         elif self.baudtype == self.Type.Identifier:
-            baudtype_str = 'Defined by identifier'
+            baudtype_str = u'Defined by identifier'
 
-        return '%sBauds, %s format.' % (str(self.effective_baudrate()), baudtype_str)
+        return u'%sBauds, %s format.' % (unicode(self.effective_baudrate()), baudtype_str)
 
     def __repr__(self):
-        return '<%s: %s at 0x%08x>' % (self.__class__.__name__, str(self), id(self))
+        return u'<%s: %s at 0x%08x>' % (self.__class__.__name__, unicode(self), id(self))
 
 #Used for IO Control service. Allows comprehensive one-liner.
-class IOMasks:
-    """
+class IOMasks(object):
+    u"""
     Allow to specify a list of masks for a :ref:`InputOutputControlByIdentifier<InputOutputControlByIdentifier>` composite codec.
 
     Example : IOMasks(mask1,mask2, mask3=True, mask4=False)
@@ -1040,11 +1051,11 @@ class IOMasks:
     def __init__(self, *args, **kwargs):
         for k in kwargs:
             if not isinstance(kwargs[k], bool):
-                raise ValueError('mask value must be a boolean value')
+                raise ValueError(u'mask value must be a boolean value')
 
         for k in args:
-            if not isinstance(k, str):
-                raise ValueError('Mask name must be a valid string')
+            if not isinstance(k, unicode):
+                raise ValueError(u'Mask name must be a valid string')
 
         self.maskdict = dict();
         for k in args:
@@ -1052,15 +1063,15 @@ class IOMasks:
 
         for k in kwargs:
             if not isinstance(kwargs[k], bool):
-                raise ValueError('Mask value must be True or False') 
+                raise ValueError(u'Mask value must be True or False') 
             self.maskdict[k] = kwargs[k]
 
     def get_dict(self):
         return self.maskdict
 
 #Used for IO Control service. Allows comprehensive one-liner.
-class IOValues:
-    """
+class IOValues(object):
+    u"""
     This class saves a function argument so they can be passed to a callback function.
 
     :param args: Arguments
@@ -1071,8 +1082,8 @@ class IOValues:
         self.kwargs = kwargs
 
 
-class Filesize:
-    """
+class Filesize(object):
+    u"""
     This class represent a file size used by the RequestFileTransfer service.
 
     :param uncompressed: Represent the uncompressed size in bytes
@@ -1087,37 +1098,39 @@ class Filesize:
     def __init__(self, uncompressed=None, compressed = None, width=None):
         
         if uncompressed is None and compressed is None:
-            raise ValueError('At least one size must be specified')
+            raise ValueError(u'At least one size must be specified')
 
         if uncompressed is not None:
-            if not isinstance(uncompressed, int):
-                raise ValueError('Uncompressed size must be an integer')
+            if not isinstance(uncompressed, (int, long)):
+                # TODO HN
+                #raise ValueError(u'Uncompressed size must be an integer')
+                raise ValueError(u'Uncompressed size must be an integer but is {:} ({:})'.format(repr(uncompressed), type(uncompressed)))
 
             if uncompressed < 0:
-                raise ValueError("Uncompressed size must be an integer greater than 0")
+                raise ValueError(u"Uncompressed size must be an integer greater than 0")
 
         if compressed is not None: 
-            if not isinstance(compressed, int):
-                raise ValueError('Compressed size must be an integer')
+            if not isinstance(compressed, (int, long)):
+                raise ValueError(u'Compressed size must be an integer')
             
             if compressed < 0:
-                raise ValueError("Comrpessed size must be an integer greater than 0")
+                raise ValueError(u"Comrpessed size must be an integer greater than 0")
         
         if width is not None:
-            if not isinstance(width, int):
-                raise ValueError('Width must be an integer')
+            if not isinstance(width, (int, long)):
+                raise ValueError(u'Width must be an integer')
     
             if width < 0:
-                raise ValueError("Width size must be an integer greater than 0")
+                raise ValueError(u"Width size must be an integer greater than 0")
             maxsize = 2**(width*8)-1
 
             if compressed is not None:
                 if compressed > maxsize:
-                    raise ValueError("With width=%d, compressed size must be smaller than %d" % (width, maxsize))
+                    raise ValueError(u"With width=%d, compressed size must be smaller than %d" % (width, maxsize))
 
             if uncompressed is not None:
                 if uncompressed > maxsize:
-                    raise ValueError("With width=%d, uncompressed size must be smaller than %d" % (width, maxsize))
+                    raise ValueError(u"With width=%d, uncompressed size must be smaller than %d" % (width, maxsize))
         else:
             width_value = 0
             if uncompressed is not None:
@@ -1125,7 +1138,7 @@ class Filesize:
 
             if compressed is not None:
                 width_value = max(width_value, compressed)
-            width = math.ceil(math.log2(width_value+1)/8)
+            width = int(math.ceil(math.log2(width_value+1)/8))
 
         self.uncompressed = uncompressed
         self.compressed = compressed
@@ -1136,26 +1149,28 @@ class Filesize:
 
     def get_uncompressed_bytes(self):
         if self.uncompressed is not None:
-            return self.uncompressed.to_bytes(self.width, byteorder='big')
+            #return self.uncompressed.to_bytes(self.width, byteorder=u'big')
+            return to_bytes(self.uncompressed, self.width, endianess=u'big')
         else:
-            return b''
+            return ''
 
     def get_compressed_bytes(self):
         if self.compressed is not None:
-            return self.compressed.to_bytes(self.width, byteorder='big')
+            #return self.compressed.to_bytes(self.width, byteorder=u'big')
+            return to_bytes(self.compressed, self.width, endianess=u'big')
         else:
-            return b''
+            return ''
 
     def __str__(self):
-        uncompressed_str    = 'None' if self.uncompressed   is None else '0x%02x' % self.uncompressed
-        compressed_str      = 'None' if self.compressed     is None else '0x%02x' % self.compressed
-        width_str           = 'None' if self.width          is None else '0x%02x' % self.width
+        uncompressed_str    = u'None' if self.uncompressed   is None else u'0x%02x' % self.uncompressed
+        compressed_str      = u'None' if self.compressed     is None else u'0x%02x' % self.compressed
+        width_str           = u'None' if self.width          is None else u'0x%02x' % self.width
 
-        return "Filesize<Uncompressed=%s, Compressed=%s. Width=%s>" % (uncompressed_str, compressed_str, width_str)
+        return u"Filesize<Uncompressed=%s, Compressed=%s. Width=%s>" % (uncompressed_str, compressed_str, width_str)
 
     def __repr__(self):
-        uncompressed_str    = 'None' if self.uncompressed   is None else '0x%02x' % self.uncompressed
-        compressed_str      = 'None' if self.compressed     is None else '0x%02x' % self.compressed
-        width_str           = 'None' if self.width          is None else '0x%02x' % self.width
+        uncompressed_str    = u'None' if self.uncompressed   is None else u'0x%02x' % self.uncompressed
+        compressed_str      = u'None' if self.compressed     is None else u'0x%02x' % self.compressed
+        width_str           = u'None' if self.width          is None else u'0x%02x' % self.width
 
-        return "<Filesize: Uncompressed=%s, Compressed=%s. Width=%s at 0x%08x>" % (uncompressed_str, compressed_str, width_str, id(self))
+        return u"<Filesize: Uncompressed=%s, Compressed=%s. Width=%s at 0x%08x>" % (uncompressed_str, compressed_str, width_str, id(self))

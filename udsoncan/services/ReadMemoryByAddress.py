@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -14,7 +15,7 @@ class ReadMemoryByAddress(BaseService):
 
     @classmethod
     def make_request(cls, memory_location):
-        """
+        u"""
         Generates a request for ReadMemoryByAddress
 
         :param memory_location: The address and the size of the memory block to read.
@@ -25,10 +26,10 @@ class ReadMemoryByAddress(BaseService):
         from udsoncan import Request, MemoryLocation
 
         if not isinstance(memory_location, MemoryLocation):
-            raise ValueError('Given memory location must be an instance of MemoryLocation')
+            raise ValueError(u'Given memory location must be an instance of MemoryLocation')
 
         request =  Request(service=cls)
-        request.data = b''
+        request.data = ''
         request.data += memory_location.alfid.get_byte() # AddressAndLengthFormatIdentifier
         request.data += memory_location.get_address_bytes()
         request.data += memory_location.get_memorysize_bytes()
@@ -37,7 +38,7 @@ class ReadMemoryByAddress(BaseService):
 
     @classmethod
     def interpret_response(cls, response):
-        """
+        u"""
         Populates the response ``service_data`` property with an instance of :class:`ReadMemoryByAddress.ResponseData<udsoncan.services.ReadMemoryByAddress.ResponseData>`
 
         :param response: The received response to interpret
@@ -46,17 +47,17 @@ class ReadMemoryByAddress(BaseService):
         :raises InvalidResponseException: If length of ``response.data`` is too short
         """		
         if len(response.data) < 1: 	
-            raise InvalidResponseException(response, "Response data must be at least 1 byte")
+            raise InvalidResponseException(response, u"Response data must be at least 1 byte")
 
         response.service_data = cls.ResponseData()
         response.service_data.memory_block = response.data
 
     class ResponseData(BaseResponseData):
-        """
+        u"""
         .. data:: memory_block
 
                 bytes object reflecting the content of the read memory
         """
         def __init__(self):
-            super().__init__(ReadMemoryByAddress)
+            super(ReadMemoryByAddress.ResponseData, self).__init__(ReadMemoryByAddress)
             self.memory_block = None

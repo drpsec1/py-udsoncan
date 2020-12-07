@@ -1,8 +1,9 @@
+from __future__ import absolute_import
 import inspect
 import struct
 
-class Response:
-    """
+class Response(object):
+    u"""
     Represents a server Response to a client Request
 
     :param service: The service implied by this response.
@@ -58,7 +59,7 @@ class Response:
             (boolean) Indicates that the response was unexpected. Set by an external source such as the :ref:`Client<Client>` object
 
     """
-    class Code:
+    class Code(object):
         PositiveResponse = 0
         GeneralReject = 0x10
         ServiceNotSupported = 0x11
@@ -117,13 +118,13 @@ class Response:
         @classmethod
         def get_name(cls, given_id):
             if given_id is None:
-                return ""
+                return u""
 
             for member in inspect.getmembers(cls):
-                if isinstance(member[1], int):
+                if isinstance(member[1], (int, long)):
                     if member[1] == given_id:
                         return member[0]
-            return str(given_id)
+            return unicode(given_id)
 
         #Tells if a code is a negative code
         @classmethod
@@ -132,7 +133,7 @@ class Response:
                 return False
 
             for member in inspect.getmembers(cls):
-                if isinstance(member[1], int):
+                if isinstance(member[1], (int, long)):
                     if member[1] == given_id:
                         return True
             return False	
@@ -147,13 +148,13 @@ class Response:
         elif inspect.isclass(service) and issubclass(service, services.BaseService):
             self.service = service
         elif service is not None:
-            raise ValueError("Given service must be a service class or instance")
+            raise ValueError(u"Given service must be a service class or instance")
 
         self.positive = False
         self.code = None
-        self.code_name = ""
+        self.code_name = u""
         self.valid = False
-        self.invalid_reason = "Object not initialized"
+        self.invalid_reason = u"Object not initialized"
         self.service_data = None
         self.original_payload = None
         self.unexpected = False
@@ -161,16 +162,16 @@ class Response:
         self.service = service
 
         if data is not None:
-            if not isinstance(data, bytes):
-                raise ValueError("Given data must be a valid bytes object")
+            if not isinstance(data, str):
+                raise ValueError(u"Given data must be a valid bytes object")
 
-        self.data = data if data is not None else b''
+        self.data = data if data is not None else ''
 
         if code is not None:
-            if not isinstance(code, int):
-                raise ValueError("Response code must be a valid integer")
+            if not isinstance(code, (int, long)):
+                raise ValueError(u"Response code must be a valid integer")
             elif code < 0 or code > 0xFF:
-                raise ValueError("Response code must be an integer between 0 and 0xFF")
+                raise ValueError(u"Response code must be an integer between 0 and 0xFF")
             self.code=code
             self.code_name = Response.Code.get_name(code)
             if not Response.Code.is_negative(code):
@@ -178,11 +179,11 @@ class Response:
 
         if self.service is not None and self.code is not None:
             self.valid = True
-            self.invalid_reason = ""
+            self.invalid_reason = u""
 
     #Used by server
     def get_payload(self):
-        """
+        u"""
         Generates a payload to be given to the underlying protocol.
         This method is meant to be used by a UDS server
 
@@ -191,18 +192,18 @@ class Response:
         """
         from udsoncan import services
         if not isinstance(self.service, services.BaseService) and not issubclass(self.service, services.BaseService):
-            raise ValueError("Cannot make payload from response object. Given service is not a valid service object")
+            raise ValueError(u"Cannot make payload from response object. Given service is not a valid service object")
 
-        if not isinstance(self.code, int):
-            raise ValueError("Cannot make payload from response object. Given response code is not a valid integer")
+        if not isinstance(self.code, (int, long)):
+            raise ValueError(u"Cannot make payload from response object. Given response code is not a valid integer")
 
-        payload  = b''
+        payload  = ''
         if self.positive:
-            payload += struct.pack("B", self.service.response_id())
+            payload += struct.pack(u"B", self.service.response_id())
         else:
-            payload += b'\x7F'
-            payload += struct.pack("B", self.service.request_id())
-            payload += struct.pack('B', self.code)
+            payload += '\x7F'
+            payload += struct.pack(u"B", self.service.request_id())
+            payload += struct.pack(u'B', self.code)
 
         if self.data is not None and self.service.has_response_data():
             payload += self.data
@@ -212,7 +213,7 @@ class Response:
     # Analyzes a TP frame and builds a Response object. Used by client
     @classmethod
     def from_payload(cls, payload):
-        """
+        u"""
         Creates a ``Response`` object from a payload coming from the underlying protocol.
         This method is meant to be used by a UDS client
 
@@ -228,15 +229,15 @@ class Response:
 
         if len(payload) < 1:
             response.valid = False
-            response.invalid_reason = "Payload is empty"
+            response.invalid_reason = u"Payload is empty"
             return response
 
 
-        if payload[0] != 0x7F:	# Positive
-            response.service = services.cls_from_response_id(payload[0])
+        if ord(payload[0]) != 0x7F:	# Positive
+            response.service = services.cls_from_response_id(ord(payload[0]))
             if response.service is None:
                 response.valid = False
-                response.invalid_reason = "Payload first byte is not a know service response ID."
+                response.invalid_reason = u"Payload first byte is not a know service response ID."
                 return response
 
             data_start=1
@@ -244,7 +245,7 @@ class Response:
             if len(payload) < 2 and response.service.has_response_data() :
                 response.valid = False
                 response.positive = False
-                response.invalid_reason = "Payload must be at least 2 bytes long (service and response)"
+                response.invalid_reason = u"Payload must be at least 2 bytes long (service and response)"
                 return response
 
             response.code = Response.Code.PositiveResponse
@@ -256,33 +257,33 @@ class Response:
 
             if len(payload) < 2 :
                 response.valid = False
-                response.invalid_reason=  "Incomplete invalid response service (7Fxx)"	
+                response.invalid_reason=  u"Incomplete invalid response service (7Fxx)"	
                 return response
-            response.service = services.cls_from_request_id(payload[1])	#Request id, not response id
+            response.service = services.cls_from_request_id(ord(payload[1]))	#Request id, not response id
 
             if response.service is None:
                 response.valid = False
-                response.invalid_reason = "Payload second byte is not a known service request ID."
+                response.invalid_reason = u"Payload second byte is not a known service request ID."
                 return response
 
             if len(payload) < 3:
                 response.valid=False
-                response.invalid_reason=  "Response code missing"
+                response.invalid_reason=  u"Response code missing"
                 return response
 
-            response.code = int(payload[2])
+            response.code = ord(payload[2])
             response.code_name = Response.Code.get_name(response.code)
 
         response.valid = True
-        response.invalid_reason = ""
+        response.invalid_reason = u""
         if len(payload) > data_start:
             response.data = payload[data_start:]
         return response
 
     def __repr__(self):
-        responsename = Response.Code.get_name(Response.Code.PositiveResponse) if self.positive else 'NegativeResponse(%s)' % self.code_name
+        responsename = Response.Code.get_name(Response.Code.PositiveResponse) if self.positive else u'NegativeResponse(%s)' % self.code_name
         bytesize = len(self.data) if self.data is not None else 0
-        return '<%s: [%s] - %d data bytes at 0x%08x>' % (responsename, self.service.get_name(), bytesize, id(self))
+        return u'<%s: [%s] - %d data bytes at 0x%08x>' % (responsename, self.service.get_name(), bytesize, id(self))
 
     def __len__(self):
         try:

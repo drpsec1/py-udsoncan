@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -5,7 +6,7 @@ from udsoncan.exceptions import *
 class SecuredDataTransmission(BaseService):
     _sid = 0x84
 
-    class Code:
+    class Code(object):
         GeneralSecurityViolation 			= Response.Code.GeneralSecurityViolation			- 0x38
         SecuredModeRequested 				= Response.Code.SecuredModeRequested				- 0x38
         InsufficientProtection 				= Response.Code.InsufficientProtection				- 0x38
@@ -31,12 +32,12 @@ class SecuredDataTransmission(BaseService):
 
     @classmethod
     def make_request(cls):
-        raise NotImplementedError('Service is not implemented')
+        raise NotImplementedError(u'Service is not implemented')
 
     @classmethod
     def interpret_response(cls, response):
-        raise NotImplementedError('Service is not implemented')
+        raise NotImplementedError(u'Service is not implemented')
 
     class ResponseData(BaseResponseData):	
         def __init__(self):
-            super().__init__(SecuredDataTransmission)
+            super(SecuredDataTransmission.ResponseData, self).__init__(SecuredDataTransmission)

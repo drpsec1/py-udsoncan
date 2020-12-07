@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -15,7 +16,7 @@ class ClearDiagnosticInformation(BaseService):
 
     @classmethod
     def make_request(cls, group=0xFFFFFF):
-        """
+        u"""
         Generates a request for ClearDiagnosticInformation
 
         :param group: DTC mask ranging from 0 to 0xFFFFFF. 0xFFFFFF means all DTCs
@@ -24,17 +25,17 @@ class ClearDiagnosticInformation(BaseService):
         :raises ValueError: If parameters are out of range, missing or wrong type
         """		
         from udsoncan import Request
-        ServiceHelper.validate_int(group, min=0, max=0xFFFFFF, name='Group of DTC')
+        ServiceHelper.validate_int(group, min=0, max=0xFFFFFF, name=u'Group of DTC')
         request = Request(service=cls)
         hb = (group >> 16) & 0xFF
         mb = (group >> 8) & 0xFF
         lb = (group >> 0) & 0xFF 
-        request.data = struct.pack("BBB", hb,mb,lb)
+        request.data = struct.pack(u"BBB", hb,mb,lb)
         return request
 
     @classmethod
     def interpret_response(cls, response):
-        """
+        u"""
         Populates the response ``service_data`` property with an instance of :class:`ClearDiagnosticInformation.ResponseData<udsoncan.services.ClearDiagnosticInformation.ResponseData>`
 
         :param response: The received response to interpret
@@ -43,8 +44,8 @@ class ClearDiagnosticInformation(BaseService):
         response.service_data = cls.ResponseData()
 
     class ResponseData(BaseResponseData):
-        """
+        u"""
         Empty object
         """		
         def __init__(self):
-            super().__init__(ClearDiagnosticInformation)
+            super(ClearDiagnosticInformation.ResponseData, self).__init__(ClearDiagnosticInformation)

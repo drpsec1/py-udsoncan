@@ -1,3 +1,5 @@
+from __future__ import with_statement
+from __future__ import absolute_import
 from udsoncan.client import Client
 from udsoncan import services
 from udsoncan.exceptions import *
@@ -10,8 +12,8 @@ class TestTesterPresent(ClientServerTest):
 
     def test_tester_present_success(self):
         request = self.conn.touserqueue.get(timeout=0.2)
-        self.assertEqual(request, b"\x3E\x00")
-        self.conn.fromuserqueue.put(b"\x7E\x00")	# Positive response
+        self.assertEqual(request, "\x3E\x00")
+        self.conn.fromuserqueue.put("\x7E\x00")	# Positive response
 
     def _test_tester_present_success(self):
         response = self.udsclient.tester_present()
@@ -19,8 +21,8 @@ class TestTesterPresent(ClientServerTest):
 
     def test_tester_present_success_spr(self):
         request = self.conn.touserqueue.get(timeout=0.2)
-        self.assertEqual(request, b"\x3E\x80")
-        self.conn.fromuserqueue.put('wait')	# Syncronize
+        self.assertEqual(request, "\x3E\x80")
+        self.conn.fromuserqueue.put(u'wait')	# Syncronize
 
     def _test_tester_present_success_spr(self):
         with self.udsclient.suppress_positive_response:
@@ -29,7 +31,7 @@ class TestTesterPresent(ClientServerTest):
         self.conn.fromuserqueue.get(timeout=0.2)	#Avoid closing connection prematurely
 
     def test_tester_present_denied_exception(self):
-        self.wait_request_and_respond(b"\x7F\x3E\x13") # IMLOIF
+        self.wait_request_and_respond("\x7F\x3E\x13") # IMLOIF
 
     def _test_tester_present_denied_exception(self):
         with self.assertRaises(NegativeResponseException) as handle:
@@ -42,10 +44,10 @@ class TestTesterPresent(ClientServerTest):
         self.assertEqual(response.code, 0x13)
 
     def test_tester_present_denied_no_exception(self):
-        self.wait_request_and_respond(b"\x7F\x3E\x13") # IMLOIF
+        self.wait_request_and_respond("\x7F\x3E\x13") # IMLOIF
 
     def _test_tester_present_denied_no_exception(self):
-        self.udsclient.config['exception_on_negative_response'] = False
+        self.udsclient.config[u'exception_on_negative_response'] = False
         response = self.udsclient.tester_present()
 
         self.assertTrue(response.valid)
@@ -54,32 +56,32 @@ class TestTesterPresent(ClientServerTest):
         self.assertEqual(response.code, 0x13)
 
     def test_tester_present_invalidservice_exception(self):
-        self.wait_request_and_respond(b"\x00\x00") #Inexistent Service
+        self.wait_request_and_respond("\x00\x00") #Inexistent Service
 
     def _test_tester_present_invalidservice_exception(self):
         with self.assertRaises(InvalidResponseException) as handle:
             self.udsclient.tester_present()
 
     def test_tester_present_invalidservice_no_exception(self):
-        self.wait_request_and_respond(b"\x00\x00") #Inexistent Service
+        self.wait_request_and_respond("\x00\x00") #Inexistent Service
 
     def _test_tester_present_invalidservice_no_exception(self):
-        self.udsclient.config['exception_on_invalid_response'] = False
+        self.udsclient.config[u'exception_on_invalid_response'] = False
         response = self.udsclient.tester_present()
         self.assertFalse(response.valid)
 
     def test_tester_present_wrongservice_exception(self):
-        self.wait_request_and_respond(b"\x50\x00") # Valid but wrong service (Tester Present)
+        self.wait_request_and_respond("\x50\x00") # Valid but wrong service (Tester Present)
 
     def _test_tester_present_wrongservice_exception(self):
         with self.assertRaises(UnexpectedResponseException) as handle:
             self.udsclient.tester_present()
 
     def test_tester_present_wrongservice_no_exception(self):
-        self.wait_request_and_respond(b"\x50\x00") # Valid but wrong service (Tester Present)
+        self.wait_request_and_respond("\x50\x00") # Valid but wrong service (Tester Present)
 
     def _test_tester_present_wrongservice_no_exception(self):
-        self.udsclient.config['exception_on_unexpected_response'] = False
+        self.udsclient.config[u'exception_on_unexpected_response'] = False
         response = self.udsclient.tester_present()
         self.assertTrue(response.valid)
         self.assertTrue(response.unexpected)

@@ -1,3 +1,5 @@
+from __future__ import division
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -9,11 +11,11 @@ class InputOutputControlByIdentifier(BaseService):
 
     #
     class ControlParam(BaseSubfunction):
-        """
+        u"""
         InputOutputControlByIdentifier defined control parameters as defined by ISO-14229:2006, Annex E
         """	
 
-        __pretty_name__ = 'control parameter'
+        __pretty_name__ = u'control parameter'
 
         returnControlToECU = 0
         resetToDefault = 1
@@ -28,7 +30,7 @@ class InputOutputControlByIdentifier(BaseService):
 
     @classmethod
     def make_request(cls, did, control_param=None, values=None, masks=None, ioconfig=None):
-        """
+        u"""
         Generates a request for InputOutputControlByIdentifier
 
         :param did: Data identifier to represent the IO
@@ -65,13 +67,13 @@ class InputOutputControlByIdentifier(BaseService):
 
         from udsoncan import Request, IOMasks, IOValues, DidCodec
 
-        ServiceHelper.validate_int(did, min=0, max=0xffff, name='DID')
+        ServiceHelper.validate_int(did, min=0, max=0xffff, name=u'DID')
         if control_param is not None:
-            if not isinstance(control_param, int):
-                raise ValueError("control_param  must be a valid integer")
+            if not isinstance(control_param, (int, long)):
+                raise ValueError(u"control_param  must be a valid integer")
 
             if control_param < 0 or control_param > 3:
-                raise ValueError('control_param must either be returnControlToECU(0), resetToDefault(1), freezeCurrentState(2), shortTermAdjustment(3). %d given.' % control_param)
+                raise ValueError(u'control_param must either be returnControlToECU(0), resetToDefault(1), freezeCurrentState(2), shortTermAdjustment(3). %d given.' % control_param)
 
         if values is not None:
             if isinstance(values, list):
@@ -80,7 +82,7 @@ class InputOutputControlByIdentifier(BaseService):
                 values = IOValues(**values)
 
             if not isinstance(values, IOValues):
-                raise ValueError("values must be an instance of IOValues")
+                raise ValueError(u"values must be an instance of IOValues")
 
         if masks is not None:
             if isinstance(masks, list):
@@ -89,20 +91,20 @@ class InputOutputControlByIdentifier(BaseService):
                 masks = IOMasks(**masks)
 
             if not isinstance(masks, IOMasks) and not isinstance(masks, bool):
-                raise ValueError("masks must be an instance of IOMask or a boolean value")
+                raise ValueError(u"masks must be an instance of IOMask or a boolean value")
 
         if values is None and masks is not None:
-            raise ValueError('An IOValue must be given if a IOMask is provided.')	
+            raise ValueError(u'An IOValue must be given if a IOMask is provided.')	
 
         request = Request(service=cls)		
 
-        request.data = b''
+        request.data = ''
         ioconfig = ServiceHelper.check_io_config(did, ioconfig)	# IO dids are defined in client config.
-        request.data += struct.pack('>H', did)
+        request.data += struct.pack(u'>H', did)
 
         # This parameter is optional according to standard
         if control_param is not None:
-            request.data += struct.pack('B', control_param)
+            request.data += struct.pack(u'B', control_param)
 
         codec = DidCodec.from_config(ioconfig[did])	# Get IO codec from config
 
@@ -111,35 +113,36 @@ class InputOutputControlByIdentifier(BaseService):
 
         if masks is not None: # Skip the masks byte if none is given.
             if isinstance(masks, bool):
-                byte = b'\xFF' if masks == True else b'\x00'
-                if 'mask_size' in  ioconfig[did]:
-                    request.data += (byte * ioconfig[did]['mask_size'])
+                byte = '\xFF' if masks == True else '\x00'
+                if u'mask_size' in  ioconfig[did]:
+                    request.data += (byte * ioconfig[did][u'mask_size'])
                 else:
-                    raise ConfigError('mask_size', msg='Given mask is boolean value, indicating that all mask should be set to same value, but no mask_size is defined in configuration. Cannot guess how many bits to set.')
+                    raise ConfigError(u'mask_size', msg=u'Given mask is boolean value, indicating that all mask should be set to same value, but no mask_size is defined in configuration. Cannot guess how many bits to set.')
 
             elif isinstance(masks, IOMasks):
-                if 'mask' not in ioconfig[did]:
-                    raise ConfigError('mask', msg='Cannot apply given mask. Input/Output configuration does not define their position (and size).')
-                masks_config = ioconfig[did]['mask']
+                if u'mask' not in ioconfig[did]:
+                    raise ConfigError(u'mask', msg=u'Cannot apply given mask. Input/Output configuration does not define their position (and size).')
+                masks_config = ioconfig[did][u'mask']
                 given_masks = masks.get_dict()
 
                 numeric_val = 0
                 for mask_name in given_masks:
                     if mask_name not in masks_config:
-                        raise ConfigError('mask_size', msg='Cannot set mask bit for mask %s. The configuration does not define its position' % (mask_name))	
+                        raise ConfigError(u'mask_size', msg=u'Cannot set mask bit for mask %s. The configuration does not define its position' % (mask_name))	
 
                     if given_masks[mask_name] == True:
                         numeric_val |= masks_config[mask_name]
 
-                minsize = math.ceil(math.log(numeric_val+1, 2)/8.0)
-                size = minsize if 'mask_size' not in ioconfig[did] else ioconfig[did]['mask_size']
-                request.data += numeric_val.to_bytes(size, 'big')
+                minsize = int(math.ceil(math.log(numeric_val+1, 2)/8.0))
+                size = minsize if u'mask_size' not in ioconfig[did] else ioconfig[did][u'mask_size']
+                #request.data += numeric_val.to_bytes(size, u'big')
+                request.data += to_bytes(numeric_val, size, endianess=u'big')
         return request
 
 
     @classmethod
     def interpret_response(cls, response, control_param=None, tolerate_zero_padding=True, ioconfig=None):
-        """
+        u"""
         Populates the response ``service_data`` property with an instance of :class:`InputOutputControlByIdentifier.ResponseData<udsoncan.services.InputOutputControlByIdentifier.ResponseData>`
 
         :param response: The received response to interpret
@@ -164,10 +167,10 @@ class InputOutputControlByIdentifier(BaseService):
         min_response_size = 2 if control_param is not None else 1	# Spec specifies that if first byte is a ControlParameter, it must be echoed back by the server
 
         if len(response.data) < min_response_size:
-            raise InvalidResponseException(response, "Response must be at least %d bytes long" % min_response_size)
+            raise InvalidResponseException(response, u"Response must be at least %d bytes long" % min_response_size)
 
         response.service_data = cls.ResponseData()
-        response.service_data.did_echo = struct.unpack(">H", response.data[0:2])[0]
+        response.service_data.did_echo = struct.unpack(u">H", response.data[0:2])[0]
 
         did = response.service_data.did_echo
         ioconfig = ServiceHelper.check_io_config(did, ioconfig)	# IO DIDs are defined in client config.
@@ -176,8 +179,8 @@ class InputOutputControlByIdentifier(BaseService):
         next_byte = 2
         if control_param is not None:
             if len(response.data) < next_byte:
-                raise InvalidResponseException(response, 'Response should include an echo of the InputOutputControlParameter (0x%02x)' % control_param)
-            response.service_data.control_param_echo = response.data[next_byte]
+                raise InvalidResponseException(response, u'Response should include an echo of the InputOutputControlParameter (0x%02x)' % control_param)
+            response.service_data.control_param_echo = ord(response.data[next_byte])
             next_byte +=1
 
         if len(response.data) >= next_byte:
@@ -189,16 +192,16 @@ class InputOutputControlByIdentifier(BaseService):
                 payload_size = len(response.data) - next_byte
 
             if len(remaining_data) > payload_size:
-                if remaining_data[payload_size:] == b'\x00' * (len(remaining_data) - payload_size):
+                if remaining_data[payload_size:] == '\x00' * (len(remaining_data) - payload_size):
                     if tolerate_zero_padding:
                         remaining_data = remaining_data[0:payload_size]
             try:
                 response.service_data.decoded_data = codec.decode(remaining_data)
-            except Exception as e:
-                raise InvalidResponseException(response, 'Response from server could not be decoded. Exception is : %s' % e)
+            except Exception, e:
+                raise InvalidResponseException(response, u'Response from server could not be decoded. Exception is : %s' % e)
 
     class ResponseData(BaseResponseData):
-        """
+        u"""
         .. data:: did_echo
 
                 DID echoed back by the server
@@ -212,7 +215,7 @@ class InputOutputControlByIdentifier(BaseService):
                 Value processed by the :ref:`DidCodec<DidCodec>`.decode() method
         """			
         def __init__(self):
-            super().__init__(InputOutputControlByIdentifier)
+            super(InputOutputControlByIdentifier.ResponseData, self).__init__(InputOutputControlByIdentifier)
             self.did_echo = None
             self.control_param_echo = None
             self.decoded_data = None

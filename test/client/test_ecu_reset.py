@@ -1,3 +1,5 @@
+from __future__ import with_statement
+from __future__ import absolute_import
 from udsoncan.client import Client
 from udsoncan import services
 from udsoncan.exceptions import *
@@ -10,8 +12,8 @@ class TestECUReset(ClientServerTest):
 
     def test_ecu_reset_success(self):
         request = self.conn.touserqueue.get(timeout=0.2)
-        self.assertEqual(request, b"\x11\x55")
-        self.conn.fromuserqueue.put(b"\x51\x55")	# Positive response
+        self.assertEqual(request, "\x11\x55")
+        self.conn.fromuserqueue.put("\x51\x55")	# Positive response
 
     def _test_ecu_reset_success(self):
         response = self.udsclient.ecu_reset(0x55)
@@ -20,8 +22,8 @@ class TestECUReset(ClientServerTest):
 
     def test_ecu_reset_success_spr(self):
         request = self.conn.touserqueue.get(timeout=0.2)
-        self.assertEqual(request, b"\x11\xD5")
-        self.conn.fromuserqueue.put("wait")	# Synchronize
+        self.assertEqual(request, "\x11\xD5")
+        self.conn.fromuserqueue.put(u"wait")	# Synchronize
 
     def _test_ecu_reset_success_spr(self):
         with self.udsclient.suppress_positive_response:
@@ -31,8 +33,8 @@ class TestECUReset(ClientServerTest):
 
     def test_ecu_reset_success_pdt(self):
         request = self.conn.touserqueue.get(timeout=0.2)
-        self.assertEqual(request, b"\x11\x04")
-        self.conn.fromuserqueue.put(b"\x51\x04\x23")	# Positive response 
+        self.assertEqual(request, "\x11\x04")
+        self.conn.fromuserqueue.put("\x51\x04\x23")	# Positive response 
 
     def _test_ecu_reset_success_pdt(self):
         response = self.udsclient.ecu_reset(services.ECUReset.ResetType.enableRapidPowerShutDown)
@@ -42,8 +44,8 @@ class TestECUReset(ClientServerTest):
 
     def test_ecu_reset_denied_exception(self):
         request = self.conn.touserqueue.get(timeout=0.2)
-        self.assertEqual(request, b"\x11\x55")
-        self.conn.fromuserqueue.put(b"\x7F\x11\x33") #Security Access Denied
+        self.assertEqual(request, "\x11\x55")
+        self.conn.fromuserqueue.put("\x7F\x11\x33") #Security Access Denied
 
     def _test_ecu_reset_denied_exception(self):
         with self.assertRaises(NegativeResponseException) as handle:
@@ -55,10 +57,10 @@ class TestECUReset(ClientServerTest):
         self.assertEqual(response.code, 0x33)
 
     def test_ecu_reset_denied_no_exception(self):
-        self.wait_request_and_respond(b"\x7F\x11\x33") #Security Access Denied
+        self.wait_request_and_respond("\x7F\x11\x33") #Security Access Denied
 
     def _test_ecu_reset_denied_no_exception(self):
-        self.udsclient.config['exception_on_negative_response'] = False
+        self.udsclient.config[u'exception_on_negative_response'] = False
         response = self.udsclient.ecu_reset(0x55)
 
         self.assertTrue(response.valid)
@@ -67,47 +69,47 @@ class TestECUReset(ClientServerTest):
         self.assertEqual(response.code, 0x33)
 
     def test_ecu_reset_invalidservice_exception(self):
-        self.wait_request_and_respond(b"\x00\x55") #Inexistent Service
+        self.wait_request_and_respond("\x00\x55") #Inexistent Service
 
     def _test_ecu_reset_invalidservice_exception(self):
         with self.assertRaises(InvalidResponseException) as handle:
             self.udsclient.ecu_reset(0x55)
 
     def test_ecu_reset_invalidservice_no_exception(self):
-        self.wait_request_and_respond(b"\x00\x55") #Inexistent Service
+        self.wait_request_and_respond("\x00\x55") #Inexistent Service
 
     def _test_ecu_reset_invalidservice_no_exception(self):
-        self.udsclient.config['exception_on_invalid_response'] = False
+        self.udsclient.config[u'exception_on_invalid_response'] = False
         response = self.udsclient.ecu_reset(0x55)
 
     def test_ecu_reset_wrongservice_exception(self):
-        self.wait_request_and_respond(b"\x7E\x00") # Valid but wrong service (Tester Present)
+        self.wait_request_and_respond("\x7E\x00") # Valid but wrong service (Tester Present)
 
     def _test_ecu_reset_wrongservice_exception(self):
         with self.assertRaises(UnexpectedResponseException) as handle:
             self.udsclient.ecu_reset(0x55)
 
     def test_ecu_reset_wrongservice_no_exception(self):
-        self.wait_request_and_respond(b"\x7E\x00") # Valid but wrong service (Tester Present)
+        self.wait_request_and_respond("\x7E\x00") # Valid but wrong service (Tester Present)
 
     def _test_ecu_reset_wrongservice_no_exception(self):
-        self.udsclient.config['exception_on_unexpected_response'] = False
+        self.udsclient.config[u'exception_on_unexpected_response'] = False
         response = self.udsclient.ecu_reset(0x55)
         self.assertTrue(response.valid)
         self.assertTrue(response.unexpected)
 
     def test_ecu_reset_missing_pdt_exception(self):
-        self.wait_request_and_respond(b"\x51\x04") # Valid but wrong service (Tester Present)
+        self.wait_request_and_respond("\x51\x04") # Valid but wrong service (Tester Present)
 
     def _test_ecu_reset_missing_pdt_exception(self):
         with self.assertRaises(InvalidResponseException) as handle:
             self.udsclient.ecu_reset(services.ECUReset.ResetType.enableRapidPowerShutDown)
 
     def test_ecu_reset_missing_pdt_no_exception(self):
-        self.wait_request_and_respond(b"\x51\x04") # Valid but wrong service (Tester Present)
+        self.wait_request_and_respond("\x51\x04") # Valid but wrong service (Tester Present)
 
     def _test_ecu_reset_missing_pdt_no_exception(self):
-        self.udsclient.config['exception_on_invalid_response'] = False
+        self.udsclient.config[u'exception_on_invalid_response'] = False
         response = self.udsclient.ecu_reset(services.ECUReset.ResetType.enableRapidPowerShutDown)
         self.assertFalse(response.valid)
 

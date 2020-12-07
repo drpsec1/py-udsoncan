@@ -1,3 +1,5 @@
+from __future__ import with_statement
+from __future__ import absolute_import
 from udsoncan.client import Client
 from udsoncan import services, CommunicationType
 from udsoncan.exceptions import *
@@ -9,10 +11,10 @@ class TestCommunicationControl(ClientServerTest):
         ClientServerTest.__init__(self, *args, **kwargs)
 
     def test_comcontrol_enable_node(self):
-        for i in range(3):
+        for i in xrange(3):
             request = self.conn.touserqueue.get(timeout=0.2)
-            self.assertEqual(request, b"\x28\x00\x01")
-            self.conn.fromuserqueue.put(b"\x68\x00")	# Positive response
+            self.assertEqual(request, "\x28\x00\x01")
+            self.conn.fromuserqueue.put("\x68\x00")	# Positive response
 
     def _test_comcontrol_enable_node(self):
         control_type = services.CommunicationControl.ControlType.enableRxAndTx
@@ -33,8 +35,8 @@ class TestCommunicationControl(ClientServerTest):
 
     def test_comcontrol_enable_node_spr(self):
         request = self.conn.touserqueue.get(timeout=0.2)
-        self.assertEqual(request, b"\x28\x80\x01")
-        self.conn.fromuserqueue.put('wait')	# Synchronize
+        self.assertEqual(request, "\x28\x80\x01")
+        self.conn.fromuserqueue.put(u'wait')	# Synchronize
 
     def _test_comcontrol_enable_node_spr(self):
         control_type = services.CommunicationControl.ControlType.enableRxAndTx
@@ -46,8 +48,8 @@ class TestCommunicationControl(ClientServerTest):
 
     def test_comcontrol_disable_subnet(self):
         request = self.conn.touserqueue.get(timeout=0.2)
-        self.assertEqual(request, b"\x28\x03\x33")
-        self.conn.fromuserqueue.put(b"\x68\x03")	# Positive response
+        self.assertEqual(request, "\x28\x03\x33")
+        self.conn.fromuserqueue.put("\x68\x03")	# Positive response
 
     def _test_comcontrol_disable_subnet(self):
         control_type = services.CommunicationControl.ControlType.disableRxAndTx
@@ -57,7 +59,7 @@ class TestCommunicationControl(ClientServerTest):
         self.assertEqual(response.service_data.control_type_echo, control_type)
 
     def test_comcontrol_negative_response_exception(self):
-        self.wait_request_and_respond(b"\x7F\x28\x31") 	# Request Out Of Range
+        self.wait_request_and_respond("\x7F\x28\x31") 	# Request Out Of Range
 
     def _test_comcontrol_negative_response_exception(self):
         with self.assertRaises(NegativeResponseException) as handle:
@@ -66,10 +68,10 @@ class TestCommunicationControl(ClientServerTest):
             self.udsclient.communication_control(control_type=control_type, communication_type=com_type)	
 
     def test_comcontrol_negative_response_no_exception(self):
-        self.wait_request_and_respond(b"\x7F\x28\x31") 	# Request Out Of Range
+        self.wait_request_and_respond("\x7F\x28\x31") 	# Request Out Of Range
 
     def _test_comcontrol_negative_response_no_exception(self):
-        self.udsclient.config['exception_on_negative_response'] = False
+        self.udsclient.config[u'exception_on_negative_response'] = False
         control_type = services.CommunicationControl.ControlType.disableRxAndTx
         com_type = CommunicationType(subnet=3, normal_msg=True, network_management_msg=True)
         response = self.udsclient.communication_control(control_type=control_type, communication_type=com_type)				
@@ -77,7 +79,7 @@ class TestCommunicationControl(ClientServerTest):
         self.assertFalse(response.positive)
 
     def test_set_params_invalidservice_exception(self):
-        self.wait_request_and_respond(b"\x00\x22") #Inexistent Service
+        self.wait_request_and_respond("\x00\x22") #Inexistent Service
 
     def _test_set_params_invalidservice_exception(self):
         with self.assertRaises(InvalidResponseException) as handle:
@@ -87,17 +89,17 @@ class TestCommunicationControl(ClientServerTest):
 
     def test_set_params_invalidservice_no_exception(self):
         request = self.conn.touserqueue.get(timeout=0.2)
-        self.conn.fromuserqueue.put(b"\x00\x22") #Inexistent Service
+        self.conn.fromuserqueue.put("\x00\x22") #Inexistent Service
 
     def _test_set_params_invalidservice_no_exception(self):
-        self.udsclient.config['exception_on_invalid_response'] = False
+        self.udsclient.config[u'exception_on_invalid_response'] = False
         control_type = services.CommunicationControl.ControlType.disableRxAndTx
         com_type = CommunicationType(subnet=5, normal_msg=True, network_management_msg=True)
         response = self.udsclient.communication_control(control_type=control_type, communication_type=com_type)	
         self.assertFalse(response.valid)
 
     def test_comcontrol_wrongservice_exception(self):
-        self.wait_request_and_respond(b"\x7E\x22") # Valid but wrong service (Tester Present)
+        self.wait_request_and_respond("\x7E\x22") # Valid but wrong service (Tester Present)
 
     def _test_comcontrol_wrongservice_exception(self):
         with self.assertRaises(UnexpectedResponseException) as handle:
@@ -106,10 +108,10 @@ class TestCommunicationControl(ClientServerTest):
             self.udsclient.communication_control(control_type=control_type, communication_type=com_type)	
 
     def test_comcontrol_wrongservice_no_exception(self):
-        self.wait_request_and_respond(b"\x7E\x22") # Valid but wrong service (Tester Present)
+        self.wait_request_and_respond("\x7E\x22") # Valid but wrong service (Tester Present)
 
     def _test_comcontrol_wrongservice_no_exception(self):
-        self.udsclient.config['exception_on_unexpected_response'] = False
+        self.udsclient.config[u'exception_on_unexpected_response'] = False
         control_type = services.CommunicationControl.ControlType.disableRxAndTx
         com_type = CommunicationType(subnet=3, normal_msg=True, network_management_msg=True)
         response = self.udsclient.communication_control(control_type=control_type, communication_type=com_type)	
@@ -117,7 +119,7 @@ class TestCommunicationControl(ClientServerTest):
         self.assertTrue(response.unexpected)
 
     def test_comcontrol_bad_control_type_exception(self):
-        self.wait_request_and_respond(b"\x68\x08") # Valid but bad control type
+        self.wait_request_and_respond("\x68\x08") # Valid but bad control type
 
     def _test_comcontrol_bad_control_type_exception(self):
         with self.assertRaises(UnexpectedResponseException) as handle:
@@ -125,10 +127,10 @@ class TestCommunicationControl(ClientServerTest):
             self.udsclient.communication_control(control_type=9, communication_type=com_type)	
 
     def test_comcontrol_bad_control_type_no_exception(self):
-        self.wait_request_and_respond(b"\x68\x08") # Valid but bad control type
+        self.wait_request_and_respond("\x68\x08") # Valid but bad control type
 
     def _test_comcontrol_bad_control_type_no_exception(self):
-        self.udsclient.config['exception_on_unexpected_response'] = False
+        self.udsclient.config[u'exception_on_unexpected_response'] = False
         com_type = CommunicationType(subnet=3, normal_msg=True, network_management_msg=True)
         response = self.udsclient.communication_control(control_type=9, communication_type=com_type)	
         self.assertTrue(response.valid)
@@ -140,7 +142,7 @@ class TestCommunicationControl(ClientServerTest):
     def _test_bad_param(self):
         valid_com_type = CommunicationType(subnet=3, normal_msg=True, network_management_msg=True)
         with self.assertRaises(ValueError):
-            self.udsclient.communication_control(control_type='x', communication_type=valid_com_type)	
+            self.udsclient.communication_control(control_type=u'x', communication_type=valid_com_type)	
 
         with self.assertRaises(ValueError):
             self.udsclient.communication_control(control_type=0x80, communication_type=valid_com_type)
@@ -149,4 +151,4 @@ class TestCommunicationControl(ClientServerTest):
             self.udsclient.communication_control(control_type=-1, communication_type=valid_com_type)
 
         with self.assertRaises(ValueError):
-            self.udsclient.communication_control(control_type=0, communication_type='x')
+            self.udsclient.communication_control(control_type=0, communication_type=u'x')

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from udsoncan import Response, Request, services, DidCodec, Routine, IOMasks, Dtc, DataIdentifier, MemoryLocation
 from udsoncan.exceptions import *
 from udsoncan.configs import default_client_config
@@ -8,9 +9,10 @@ import binascii
 import traceback
 import functools
 import time
+from itertools import imap
 
-class Client:
-    """
+class Client(object):
+    u"""
     __init__(self, conn, config=default_client_config, request_timeout = None)
 
     Object that interacts with a UDS server. 
@@ -26,7 +28,7 @@ class Client:
     :type request_timeout: int
     """
 
-    class SuppressPositiveResponse:
+    class SuppressPositiveResponse(object):
         def __init__(self):
             self.enabled = False
 
@@ -37,7 +39,7 @@ class Client:
         def __exit__(self, type, value, traceback):
             self.enabled = False
 
-    class PayloadOverrider:
+    class PayloadOverrider(object):
         def __init__(self):
             self.modifier = None
             self.enabled = False
@@ -67,7 +69,7 @@ class Client:
 
         #For backward compatibility
         if request_timeout is not None:
-            self.config['request_timeout'] = request_timeout
+            self.config[u'request_timeout'] = request_timeout
         self.suppress_positive_response = Client.SuppressPositiveResponse()
         self.payload_override = Client.PayloadOverrider()
         self.last_response = None
@@ -91,9 +93,9 @@ class Client:
         self.conn.close()
 
     def configure_logger(self):
-        logger_name = 'UdsClient'
-        if 'logger_name' in self.config:
-            logger_name = "UdsClient[%s]" % self.config['logger_name']
+        logger_name = u'UdsClient'
+        if u'logger_name' in self.config:
+            logger_name = u"UdsClient[%s]" % self.config[u'logger_name']
 
         self.logger = logging.getLogger(logger_name)
 
@@ -113,8 +115,8 @@ class Client:
         self.validate_config()
 
     def validate_config(self):
-        if self.config['standard_version'] not in [2006,2013,2020]:
-            raise ConfigError('Valid standard versions are 2006, 2013, 2020. %s is not supported' % self.config['standard_version'])
+        if self.config[u'standard_version'] not in [2006,2013,2020]:
+            raise ConfigError(u'Valid standard versions are 2006, 2013, 2020. %s is not supported' % self.config[u'standard_version'])
 
 
 
@@ -130,47 +132,47 @@ class Client:
             try:
                 return func(self, *args, **kwargs)
 
-            except NegativeResponseException as e:
+            except NegativeResponseException, e:
                 e.positive = False
-                if self.config['exception_on_negative_response']:
-                    logline = '[%s] : %s' % (e.__class__.__name__, str(e))
+                if self.config[u'exception_on_negative_response']:
+                    logline = u'[%s] : %s' % (e.__class__.__name__, unicode(e))
                     self.logger.warning(logline)
                     raise
                 else:
-                    self.logger.warning(str(e))
+                    self.logger.warning(unicode(e))
                     return e.response
 
-            except InvalidResponseException as e:
+            except InvalidResponseException, e:
                 e.response.valid = False
-                if self.config['exception_on_invalid_response']:
-                    self.logger.error('[%s] : %s' % (e.__class__.__name__, str(e)))
+                if self.config[u'exception_on_invalid_response']:
+                    self.logger.error(u'[%s] : %s' % (e.__class__.__name__, unicode(e)))
                     raise
                 else:
-                    self.logger.error(str(e))
+                    self.logger.error(unicode(e))
                     return e.response
 
-            except UnexpectedResponseException as e:
+            except UnexpectedResponseException, e:
                 e.response.unexpected = True
-                if self.config['exception_on_unexpected_response']:
-                    self.logger.error('[%s] : %s' % (e.__class__.__name__, str(e)))
+                if self.config[u'exception_on_unexpected_response']:
+                    self.logger.error(u'[%s] : %s' % (e.__class__.__name__, unicode(e)))
                     raise
                 else:
-                    self.logger.error(str(e))
+                    self.logger.error(unicode(e))
                     return e.response
 
-            except Exception as e:
-                self.logger.error('[%s] : %s' % (e.__class__.__name__, str(e)))
+            except Exception, e:
+                self.logger.error(u'[%s] : %s' % (e.__class__.__name__, unicode(e)))
                 raise
 
         decorated._func_no_error_management = func
         return decorated
 
     def service_log_prefix(self, service):
-        return "%s<0x%02x>" % (service.get_name(), service.request_id())
+        return u"%s<0x%02x>" % (service.get_name(), service.request_id())
 
     @standard_error_management
     def change_session(self, newsession):
-        """ 
+        u""" 
         Requests the server to change the diagnostic session with a :ref:`DiagnosticSessionControl<DiagnosticSessionControl>` service request
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -183,29 +185,29 @@ class Client:
         """
         req = services.DiagnosticSessionControl.make_request(newsession)
 
-        named_newsession = '%s (0x%02x)' % (services.DiagnosticSessionControl.Session.get_name(newsession), newsession)
-        self.logger.info('%s - Switching session to %s' % (self.service_log_prefix(services.DiagnosticSessionControl), named_newsession))
+        named_newsession = u'%s (0x%02x)' % (services.DiagnosticSessionControl.Session.get_name(newsession), newsession)
+        self.logger.info(u'%s - Switching session to %s' % (self.service_log_prefix(services.DiagnosticSessionControl), named_newsession))
 
         response = self.send_request(req)
         if response is None:
             return 
 
-        services.DiagnosticSessionControl.interpret_response(response, standard_version = self.config['standard_version'])
+        services.DiagnosticSessionControl.interpret_response(response, standard_version = self.config[u'standard_version'])
 
         if newsession != response.service_data.session_echo:
-            raise UnexpectedResponseException(response, "Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (response.service_data.session_echo, newsession))
+            raise UnexpectedResponseException(response, u"Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (response.service_data.session_echo, newsession))
 
-        if self.config['standard_version'] > 2006:
-            if self.config['use_server_timing']:
-                self.logger.info('%s - Received new timing parameters. P2=%.3fs and P2*=%.3fs.  Using these value from now on.' % (self.service_log_prefix(services.DiagnosticSessionControl), response.service_data.p2_server_max, response.service_data.p2_star_server_max))
-                self.session_timing['p2_server_max'] = response.service_data.p2_server_max
-                self.session_timing['p2_star_server_max'] = response.service_data.p2_star_server_max
+        if self.config[u'standard_version'] > 2006:
+            if self.config[u'use_server_timing']:
+                self.logger.info(u'%s - Received new timing parameters. P2=%.3fs and P2*=%.3fs.  Using these value from now on.' % (self.service_log_prefix(services.DiagnosticSessionControl), response.service_data.p2_server_max, response.service_data.p2_star_server_max))
+                self.session_timing[u'p2_server_max'] = response.service_data.p2_server_max
+                self.session_timing[u'p2_star_server_max'] = response.service_data.p2_star_server_max
 
         return response
 
     @standard_error_management
     def request_seed(self, level):
-        """ 
+        u""" 
         Requests a seed to unlock a security level with the :ref:`SecurityAccess<SecurityAccess>` service 
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -218,7 +220,7 @@ class Client:
         """		
         req = services.SecurityAccess.make_request(level, mode=services.SecurityAccess.Mode.RequestSeed)
 
-        self.logger.info('%s - Requesting seed to unlock security access level 0x%02x' % (self.service_log_prefix(services.SecurityAccess), req.subfunction))	# level may be corrected by service.
+        self.logger.info(u'%s - Requesting seed to unlock security access level 0x%02x' % (self.service_log_prefix(services.SecurityAccess), req.subfunction))	# level may be corrected by service.
 
         response = self.send_request(req)
         if response is None:
@@ -229,15 +231,15 @@ class Client:
         expected_level = services.SecurityAccess.normalize_level(mode=services.SecurityAccess.Mode.RequestSeed, level=level)
         received_level = response.service_data.security_level_echo
         if expected_level != received_level:
-            raise UnexpectedResponseException(response, "Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (received_level, expected_level))
+            raise UnexpectedResponseException(response, u"Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (received_level, expected_level))
 
-        self.logger.debug('Received seed [%s]' % (binascii.hexlify(response.service_data.seed)))
+        self.logger.debug(u'Received seed [%s]' % (binascii.hexlify(response.service_data.seed)))
         return response
 
     # Performs a SecurityAccess service request. Send key
     @standard_error_management
     def send_key(self, level, key):
-        """ 
+        u""" 
         Sends a key to unlock a security level with the :ref:`SecurityAccess<SecurityAccess>` service 
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -252,8 +254,8 @@ class Client:
         :rtype: :ref:`Response<Response>`
         """			
         req = services.SecurityAccess.make_request(level, mode=services.SecurityAccess.Mode.SendKey, key=key)
-        self.logger.info('%s - Sending key to unlock security access level 0x%02x' % (self.service_log_prefix(services.SecurityAccess), req.subfunction))
-        self.logger.debug('\tKey to send [%s]' % (binascii.hexlify(key)))
+        self.logger.info(u'%s - Sending key to unlock security access level 0x%02x' % (self.service_log_prefix(services.SecurityAccess), req.subfunction))
+        self.logger.debug(u'\tKey to send [%s]' % (binascii.hexlify(key)))
 
         response = self.send_request(req)
         if response is None:
@@ -264,13 +266,13 @@ class Client:
         expected_level = services.SecurityAccess.normalize_level(mode=services.SecurityAccess.Mode.SendKey, level=level)
         received_level = response.service_data.security_level_echo
         if expected_level != received_level:
-            raise UnexpectedResponseException(response, "Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (received_level, expected_level))
+            raise UnexpectedResponseException(response, u"Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (received_level, expected_level))
 
         return response
 
     @standard_error_management
     def unlock_security_access(self, level):
-        """
+        u"""
         Successively calls request_seed and send_key to unlock a security level with the :ref:`SecurityAccess<SecurityAccess>` service.
         The key computation is done by calling config['security_algo']
 
@@ -283,39 +285,39 @@ class Client:
         :rtype: :ref:`Response<Response>`
         """
 
-        if 'security_algo' not in self.config or not callable(self.config['security_algo']):
-            raise NotImplementedError("Client configuration does not provide a security algorithm")
+        if u'security_algo' not in self.config or not callable(self.config[u'security_algo']):
+            raise NotImplementedError(u"Client configuration does not provide a security algorithm")
 
         response = self.request_seed._func_no_error_management(self, level)
         seed = response.service_data.seed
-        if len(seed) > 0 and seed == b'\x00' * len(seed):
-            self.logger.info('%s - Security access level 0x%02x is already unlocked, no key will be sent.' % (self.service_log_prefix(services.SecurityAccess), level))
+        if len(seed) > 0 and seed == '\x00' * len(seed):
+            self.logger.info(u'%s - Security access level 0x%02x is already unlocked, no key will be sent.' % (self.service_log_prefix(services.SecurityAccess), level))
             return response
 
-        params = self.config['security_algo_params'] if 'security_algo_params' in self.config else None
+        params = self.config[u'security_algo_params'] if u'security_algo_params' in self.config else None
 
         # Starting from V1.12, level is now passed to the algorithm.
         # We now use named parameters for backward compatibility
         algo_params = {}
         try:
-            algo_args =  self.config['security_algo'].__code__.co_varnames[:self.config['security_algo'].__code__.co_argcount]
+            algo_args =  self.config[u'security_algo'].func_code.co_varnames[:self.config[u'security_algo'].func_code.co_argcount]
             
-            if 'seed' in algo_args:
-                algo_params['seed'] = seed
-            if 'level' in algo_args:
-                algo_params['level'] = level
-            if 'params' in algo_args:
-                algo_params['params'] = params
+            if u'seed' in algo_args:
+                algo_params[u'seed'] = seed
+            if u'level' in algo_args:
+                algo_params[u'level'] = level
+            if u'params' in algo_args:
+                algo_params[u'params'] = params
         except:
-            algo_params = {'seed':seed, 'params' : params, 'level' : level}
+            algo_params = {u'seed':seed, u'params' : params, u'level' : level}
 
-        key = self.config['security_algo'].__call__(**algo_params)
+        key = self.config[u'security_algo'].__call__(**algo_params)
         return self.send_key._func_no_error_management(self, level, key)
 
 
     @standard_error_management
     def tester_present(self):
-        """
+        u"""
         Sends a TesterPresent request to keep the session active.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -325,7 +327,7 @@ class Client:
         """
         req = services.TesterPresent.make_request()
 
-        self.logger.info('%s - Sending TesterPresent request' % (self.service_log_prefix(services.TesterPresent)))
+        self.logger.info(u'%s - Sending TesterPresent request' % (self.service_log_prefix(services.TesterPresent)))
         response = self.send_request(req)
         if response is None:
             return
@@ -333,13 +335,13 @@ class Client:
         services.TesterPresent.interpret_response(response)
 
         if req.subfunction != response.service_data.subfunction_echo:
-            raise UnexpectedResponseException(response, "Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (response.service_data.subfunction_echo, req.subfunction))
+            raise UnexpectedResponseException(response, u"Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (response.service_data.subfunction_echo, req.subfunction))
 
         return response
 
     @standard_error_management
     def read_data_by_identifier_first(self, didlist):
-        """
+        u"""
         Shortcut to extract a single DID. 
         Calls read_data_by_identifier then returns the first DID asked for. 
 
@@ -359,7 +361,7 @@ class Client:
 
     @standard_error_management
     def read_data_by_identifier(self, didlist):
-        """
+        u"""
         Requests a value associated with a data identifier (DID) through the :ref:`ReadDataByIdentifier<ReadDataByIdentifier>` service.
 
         :Effective configuration: ``exception_on_<type>_response`` ``data_identifiers`` ``tolerate_zero_padding``
@@ -373,33 +375,33 @@ class Client:
         :rtype: :ref:`Response<Response>`
         """
         didlist = services.ReadDataByIdentifier.validate_didlist_input(didlist)
-        req = services.ReadDataByIdentifier.make_request(didlist=didlist, didconfig=self.config['data_identifiers'])
+        req = services.ReadDataByIdentifier.make_request(didlist=didlist, didconfig=self.config[u'data_identifiers'])
 
         if len(didlist) == 1:
-            self.logger.info("%s - Reading data identifier : 0x%04x (%s)" % (self.service_log_prefix(services.ReadDataByIdentifier), didlist[0], DataIdentifier.name_from_id(didlist[0])))
+            self.logger.info(u"%s - Reading data identifier : 0x%04x (%s)" % (self.service_log_prefix(services.ReadDataByIdentifier), didlist[0], DataIdentifier.name_from_id(didlist[0])))
         else:
-            self.logger.info("%s - Reading %d data identifier : %s" % (self.service_log_prefix(services.ReadDataByIdentifier), len(didlist), list(map(hex,didlist))))
+            self.logger.info(u"%s - Reading %d data identifier : %s" % (self.service_log_prefix(services.ReadDataByIdentifier), len(didlist), list(imap(hex,didlist))))
 
-        if 'data_identifiers' not in self.config or  not isinstance(self.config['data_identifiers'], dict):
-            raise AttributeError('Configuration does not contains a valid data identifier description.')
+        if u'data_identifiers' not in self.config or  not isinstance(self.config[u'data_identifiers'], dict):
+            raise AttributeError(u'Configuration does not contains a valid data identifier description.')
 
         response = self.send_request(req)
         if response is None:
             return
 
         params = {
-                'didlist' : didlist, 
-                'didconfig' : self.config['data_identifiers'],
-                'tolerate_zero_padding' : self.config['tolerate_zero_padding']
+                u'didlist' : didlist, 
+                u'didconfig' : self.config[u'data_identifiers'],
+                u'tolerate_zero_padding' : self.config[u'tolerate_zero_padding']
                 }
 
         try:
             services.ReadDataByIdentifier.interpret_response(response, **params)
-        except ConfigError as e:
+        except ConfigError, e:
             if e.key in didlist:
                 raise
             else:
-                raise UnexpectedResponseException(response, "Server returned values for data identifier 0x%04x that was not requested and no Codec was defined for it. Parsing must be stopped." % (e.key))
+                raise UnexpectedResponseException(response, u"Server returned values for data identifier 0x%04x that was not requested and no Codec was defined for it. Parsing must be stopped." % (e.key))
 
         set_request_didlist = set(didlist)
         set_response_didlist = set(response.service_data.values.keys())
@@ -407,10 +409,10 @@ class Client:
         missing_did  = set_request_didlist - set_response_didlist
 
         if len(extra_did) > 0:
-            raise UnexpectedResponseException(response, "Server returned values for %d data identifier that were not requested. Dids are : %s" % (len(extra_did), extra_did))
+            raise UnexpectedResponseException(response, u"Server returned values for %d data identifier that were not requested. Dids are : %s" % (len(extra_did), extra_did))
 
         if len(missing_did) > 0:
-            raise UnexpectedResponseException(response, "%d data identifier values are missing from server response. Dids are : %s" % (len(missing_did), missing_did))
+            raise UnexpectedResponseException(response, u"%d data identifier values are missing from server response. Dids are : %s" % (len(missing_did), missing_did))
 
         return response
 
@@ -418,7 +420,7 @@ class Client:
     # Performs a WriteDataByIdentifier request.
     @standard_error_management
     def write_data_by_identifier(self, did, value):
-        """
+        u"""
         Requests to write a value associated with a data identifier (DID) through the :ref:`WriteDataByIdentifier<WriteDataByIdentifier>` service.
 
         :Effective configuration:  ``exception_on_<type>_response`` ``data_identifiers``
@@ -433,8 +435,8 @@ class Client:
         :rtype: :ref:`Response<Response>`
 
         """
-        req = services.WriteDataByIdentifier.make_request(did, value, didconfig=self.config['data_identifiers'])
-        self.logger.info("%s - Writing data identifier 0x%04x (%s)" % (self.service_log_prefix(services.WriteDataByIdentifier), did, DataIdentifier.name_from_id(did)))
+        req = services.WriteDataByIdentifier.make_request(did, value, didconfig=self.config[u'data_identifiers'])
+        self.logger.info(u"%s - Writing data identifier 0x%04x (%s)" % (self.service_log_prefix(services.WriteDataByIdentifier), did, DataIdentifier.name_from_id(did)))
 
         response = self.send_request(req)
         if response is None:
@@ -442,13 +444,13 @@ class Client:
         services.WriteDataByIdentifier.interpret_response(response)
 
         if response.service_data.did_echo != did:
-            raise UnexpectedResponseException(response, "Server returned a response for data identifier 0x%04x while client requested for did 0x%04x" % (response.service_data.did_echo, did))
+            raise UnexpectedResponseException(response, u"Server returned a response for data identifier 0x%04x while client requested for did 0x%04x" % (response.service_data.did_echo, did))
 
         return response
 
     @standard_error_management
     def ecu_reset(self, reset_type):
-        """
+        u"""
         Requests the server to execute a reset sequence through the :ref:`ECUReset<ECUReset>` service.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -461,7 +463,7 @@ class Client:
 
         """
         req = services.ECUReset.make_request(reset_type)
-        self.logger.info("%s - Requesting reset of type 0x%02x (%s)" % (self.service_log_prefix(services.ECUReset), reset_type, services.ECUReset.ResetType.get_name(reset_type)))
+        self.logger.info(u"%s - Requesting reset of type 0x%02x (%s)" % (self.service_log_prefix(services.ECUReset), reset_type, services.ECUReset.ResetType.get_name(reset_type)))
 
         response = self.send_request(req)
         if response is None:
@@ -469,16 +471,16 @@ class Client:
         services.ECUReset.interpret_response(response)
 
         if response.service_data.reset_type_echo != reset_type:
-            raise UnexpectedResponseException(response, "Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (response.service_data.reset_type_echo, reset_type))
+            raise UnexpectedResponseException(response, u"Response subfunction received from server (0x%02x) does not match the requested subfunction (0x%02x)" % (response.service_data.reset_type_echo, reset_type))
 
         if response.service_data.reset_type_echo == services.ECUReset.ResetType.enableRapidPowerShutDown and response.service_data.powerdown_time != 0xFF:
-            self.logger.info('Server will shutdown in %d seconds.' % (response.service_data.powerdown_time))
+            self.logger.info(u'Server will shutdown in %d seconds.' % (response.service_data.powerdown_time))
 
         return response
 
     @standard_error_management 
     def clear_dtc(self, group=0xFFFFFF):
-        """
+        u"""
         Requests the server to clear its active Diagnostic Trouble Codes with the :ref:`ClearDiagnosticInformation<ClearDiagnosticInformation>` service.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -496,9 +498,9 @@ class Client:
 
         request = services.ClearDiagnosticInformation.make_request(group)
         if group == 0xFFFFFF:
-            self.logger.info('%s - Clearing all DTCs (group mask : 0xFFFFFF)' % (self.service_log_prefix(services.ClearDiagnosticInformation)))
+            self.logger.info(u'%s - Clearing all DTCs (group mask : 0xFFFFFF)' % (self.service_log_prefix(services.ClearDiagnosticInformation)))
         else:
-            self.logger.info('%s - Clearing DTCs matching group mask : 0x%06x' % (self.service_log_prefix(services.ClearDiagnosticInformation), group))
+            self.logger.info(u'%s - Clearing DTCs matching group mask : 0x%06x' % (self.service_log_prefix(services.ClearDiagnosticInformation), group))
 
         response = self.send_request(request)
         if response is None:
@@ -509,7 +511,7 @@ class Client:
 
     # Performs a RoutineControl Service request
     def start_routine(self, routine_id, data=None):
-        """
+        u"""
         Requests the server to start a routine through the :ref:`RoutineControl<RoutineControl>` service (subfunction = 0x01).
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -528,7 +530,7 @@ class Client:
 
     # Performs a RoutineControl Service request
     def stop_routine(self, routine_id, data=None):
-        """
+        u"""
         Requests the server to stop a routine through the :ref:`RoutineControl<RoutineControl>` service (subfunction = 0x02).
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -547,7 +549,7 @@ class Client:
 
     # Performs a RoutineControl Service request
     def get_routine_result(self, routine_id, data=None):
-        """
+        u"""
         Requests the server to send back the execution result of the specified routine through the :ref:`RoutineControl<RoutineControl>` service (subfunction = 0x03).
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -566,7 +568,7 @@ class Client:
     # Performs a RoutineControl Service request
     @standard_error_management
     def routine_control(self, routine_id, control_type, data=None):
-        """
+        u"""
         Sends a generic request for the :ref:`RoutineControl<RoutineControl>` service with custom subfunction (control_type).
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -585,17 +587,17 @@ class Client:
         """
         request = services.RoutineControl.make_request(routine_id, control_type, data=data)
         payload_length = 0 if data is None else len(data)
-        action = "ISOSAEReserved action for routine ID"
+        action = u"ISOSAEReserved action for routine ID"
         if control_type == services.RoutineControl.ControlType.startRoutine:
-            action = "Starting routine ID"
+            action = u"Starting routine ID"
         elif control_type == services.RoutineControl.ControlType.stopRoutine:
-            action = "Stoping routine ID"
+            action = u"Stoping routine ID"
         elif control_type == services.RoutineControl.ControlType.requestRoutineResults:
-            action = "Requesting result for routine ID"
+            action = u"Requesting result for routine ID"
 
-        self.logger.info("%s - ControlType=0x%02x - %s 0x%04x (%s) with a payload of %d bytes" % (self.service_log_prefix(services.RoutineControl), control_type, action,  routine_id, Routine.name_from_id(routine_id), payload_length ))
+        self.logger.info(u"%s - ControlType=0x%02x - %s 0x%04x (%s) with a payload of %d bytes" % (self.service_log_prefix(services.RoutineControl), control_type, action,  routine_id, Routine.name_from_id(routine_id), payload_length ))
         if data is not None:
-            self.logger.debug("\tPayload data : %s" % binascii.hexlify(data))
+            self.logger.debug(u"\tPayload data : %s" % binascii.hexlify(data))
 
         response = self.send_request(request)
         if response is None:
@@ -603,15 +605,15 @@ class Client:
         services.RoutineControl.interpret_response(response)
 
         if control_type != response.service_data.control_type_echo:
-            raise UnexpectedResponseException(response, "Control type of response (0x%02x) does not match request control type (0x%02x)" % (response.service_data.control_type_echo, control_type))
+            raise UnexpectedResponseException(response, u"Control type of response (0x%02x) does not match request control type (0x%02x)" % (response.service_data.control_type_echo, control_type))
 
         if routine_id != response.service_data.routine_id_echo:
-            raise UnexpectedResponseException(response, "Response received from server (ID = 0x%04x) does not match the requested routine ID (0x%04x)" % (response.service_data.routine_id_echo, routine_id))
+            raise UnexpectedResponseException(response, u"Response received from server (ID = 0x%04x) does not match the requested routine ID (0x%04x)" % (response.service_data.routine_id_echo, routine_id))
 
         return response
 
     def read_extended_timing_parameters(self):
-        """
+        u"""
         Reads the timing parameters from the server with :ref:`AccessTimingParameter<AccessTimingParameter>` service with subfunction ``readExtendedTimingParameterSet`` (0x01).
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -623,7 +625,7 @@ class Client:
         return self.access_timing_parameter(access_type=services.AccessTimingParameter.AccessType.readExtendedTimingParameterSet)
 
     def reset_default_timing_parameters(self):
-        """
+        u"""
         Resets the server timing parameters to their default value with :ref:`AccessTimingParameter<AccessTimingParameter>` service with subfunction ``setTimingParametersToDefaultValues`` (0x02).
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -635,7 +637,7 @@ class Client:
         return self.access_timing_parameter(access_type=services.AccessTimingParameter.AccessType.setTimingParametersToDefaultValues)
 
     def read_active_timing_parameters(self):
-        """
+        u"""
         Reads the currently active timing parameters from the server with :ref:`AccessTimingParameter<AccessTimingParameter>` service with subfunction ``readCurrentlyActiveTimingParameters`` (0x03).
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -647,7 +649,7 @@ class Client:
         return self.access_timing_parameter(access_type=services.AccessTimingParameter.AccessType.readCurrentlyActiveTimingParameters)
 
     def set_timing_parameters(self, params):
-        """
+        u"""
         Sets the timing parameters into the server with :ref:`AccessTimingParameter<AccessTimingParameter>` service with subfunction ``setTimingParametersToGivenValues`` (0x04).
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -664,7 +666,7 @@ class Client:
 
     @standard_error_management
     def access_timing_parameter(self, access_type, timing_param_record=None):
-        """
+        u"""
         Sends a generic request for :ref:`AccessTimingParameter<AccessTimingParameter>` service with configurable subfunction (access_type).
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -683,9 +685,9 @@ class Client:
         request = services.AccessTimingParameter.make_request(access_type, timing_param_record)
         payload_length = 0 if timing_param_record is None else len(timing_param_record)
 
-        self.logger.info('%s - AccessType=0x%02x (%s) - Sending request with record payload of %d bytes' % (self.service_log_prefix(services.AccessTimingParameter), access_type, services.AccessTimingParameter.AccessType.get_name(access_type), payload_length))
+        self.logger.info(u'%s - AccessType=0x%02x (%s) - Sending request with record payload of %d bytes' % (self.service_log_prefix(services.AccessTimingParameter), access_type, services.AccessTimingParameter.AccessType.get_name(access_type), payload_length))
         if timing_param_record is not None:
-            self.logger.debug("Payload data : %s" % binascii.hexlify(data))
+            self.logger.debug(u"Payload data : %s" % binascii.hexlify(data))
 
         response = self.send_request(request)
         if response is None:
@@ -694,7 +696,7 @@ class Client:
         services.AccessTimingParameter.interpret_response(response)
 
         if access_type != response.service_data.access_type_echo:
-            raise UnexpectedResponseException(response, "Access type of response (0x%02x) does not match request access type (0x%02x)" % (response.service_data.access_type_echo, access_type))
+            raise UnexpectedResponseException(response, u"Access type of response (0x%02x) does not match request access type (0x%02x)" % (response.service_data.access_type_echo, access_type))
 
         allowed_response_record_access_type = [
                 services.AccessTimingParameter.AccessType.readExtendedTimingParameterSet, 
@@ -702,13 +704,13 @@ class Client:
         ]
 
         if len(response.service_data.timing_param_record) > 0 and access_type not in allowed_response_record_access_type:
-            self.logger.warning("Server returned data in the AccessTimingParameter response although none was asked")
+            self.logger.warning(u"Server returned data in the AccessTimingParameter response although none was asked")
 
         return response
 
     @standard_error_management
     def communication_control(self, control_type, communication_type):
-        """
+        u"""
         Switches the transmission or reception of certain messages on/off with :ref:`CommunicationControl<CommunicationControl>` service.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -726,7 +728,7 @@ class Client:
         communication_type = services.CommunicationControl.normalize_communication_type(communication_type)
 
         request = services.CommunicationControl.make_request(control_type, communication_type)
-        self.logger.info('%s - ControlType=0x%02x (%s) - Sending request with a CommunicationType byte of 0x%02x (%s)' % (self.service_log_prefix(services.CommunicationControl), control_type, services.CommunicationControl.ControlType.get_name(control_type), communication_type.get_byte_as_int(), str(communication_type)))
+        self.logger.info(u'%s - ControlType=0x%02x (%s) - Sending request with a CommunicationType byte of 0x%02x (%s)' % (self.service_log_prefix(services.CommunicationControl), control_type, services.CommunicationControl.ControlType.get_name(control_type), communication_type.get_byte_as_int(), unicode(communication_type)))
 
         response = self.send_request(request)
         if response is None:
@@ -735,12 +737,12 @@ class Client:
         services.CommunicationControl.interpret_response(response)
 
         if control_type != response.service_data.control_type_echo:
-            raise UnexpectedResponseException(response, "Control type of response (0x%02x) does not match request control type (0x%02x)" % (response.service_data.control_type_echo, control_type))
+            raise UnexpectedResponseException(response, u"Control type of response (0x%02x) does not match request control type (0x%02x)" % (response.service_data.control_type_echo, control_type))
 
         return response
 
     def request_download(self, memory_location, dfi=None):
-        """
+        u"""
         Informs the server that the client wants to initiate a download from the client to the server by sending a :ref:`RequestDownload<RequestDownload>` service request.
 
         :Effective configuration: ``exception_on_<type>_response`` ``server_address_format`` ``server_memorysize_format``
@@ -758,7 +760,7 @@ class Client:
         return self.request_upload_download(services.RequestDownload, memory_location, dfi)
 
     def request_upload(self, memory_location, dfi=None):
-        """
+        u"""
         Informs the server that the client wants to initiate an upload from the server to the client by sending a :ref:`RequestUpload<RequestUpload>` service request.
 
         :Effective configuration: ``exception_on_<type>_response`` ``server_address_format`` ``server_memorysize_format``
@@ -781,27 +783,27 @@ class Client:
         dfi = service_cls.normalize_data_format_identifier(dfi)
 
         if service_cls not in [services.RequestDownload, services.RequestUpload]:
-            raise ValueError('Service must either be RequestDownload or RequestUpload')
+            raise ValueError(u'Service must either be RequestDownload or RequestUpload')
 
         if not isinstance(memory_location, MemoryLocation):
-            raise ValueError('memory_location must be an instance of MemoryLocation')
+            raise ValueError(u'memory_location must be an instance of MemoryLocation')
 
         # If user does not specify a byte format, we apply the one in client configuration.
-        if 'server_address_format' in self.config:
-            memory_location.set_format_if_none(address_format=self.config['server_address_format'])
+        if u'server_address_format' in self.config:
+            memory_location.set_format_if_none(address_format=self.config[u'server_address_format'])
 
-        if 'server_memorysize_format' in self.config:
-            memory_location.set_format_if_none(memorysize_format=self.config['server_memorysize_format'])
+        if u'server_memorysize_format' in self.config:
+            memory_location.set_format_if_none(memorysize_format=self.config[u'server_memorysize_format'])
 
         request = service_cls.make_request(memory_location=memory_location, dfi=dfi)
 
-        action = ""
+        action = u""
         if service_cls == services.RequestDownload:
-            action = "Requesting a download (client to server)"
+            action = u"Requesting a download (client to server)"
         elif service_cls == services.RequestUpload:
-            action = "Requesting an upload (server to client)"
+            action = u"Requesting an upload (server to client)"
 
-        self.logger.info('%s - %s for memory location [%s] and DataFormatIdentifier 0x%02x (%s)' % (self.service_log_prefix(service_cls), action, str(memory_location), dfi.get_byte_as_int(), str(dfi)))
+        self.logger.info(u'%s - %s for memory location [%s] and DataFormatIdentifier 0x%02x (%s)' % (self.service_log_prefix(service_cls), action, unicode(memory_location), dfi.get_byte_as_int(), unicode(dfi)))
 
         response = self.send_request(request)
         if response is None:
@@ -812,7 +814,7 @@ class Client:
 
     @standard_error_management
     def transfer_data(self, sequence_number, data=None):
-        """
+        u"""
         Transfer a block of data to/from the client to/from the server by sending a :ref:`TransferData<TransferData>` service request and returning the server response.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -830,9 +832,9 @@ class Client:
         request = services.TransferData.make_request(sequence_number, data)
 
         data_len = 0 if data is None else len(data)
-        self.logger.info('%s - Sending a block of data with SequenceNumber=%d that is %d bytes long .' % (self.service_log_prefix(services.TransferData), sequence_number, data_len))
+        self.logger.info(u'%s - Sending a block of data with SequenceNumber=%d that is %d bytes long .' % (self.service_log_prefix(services.TransferData), sequence_number, data_len))
         if data is not None:
-            self.logger.debug('Data to transfer : %s' % binascii.hexlify(data))
+            self.logger.debug(u'Data to transfer : %s' % binascii.hexlify(data))
 
         response = self.send_request(request)
         if response is None:
@@ -840,13 +842,13 @@ class Client:
         services.TransferData.interpret_response(response)
 
         if sequence_number != response.service_data.sequence_number_echo:
-            raise UnexpectedResponseException(response, "Block sequence number of response (0x%02x) does not match request block sequence number (0x%02x)" % (response.service_data.sequence_number_echo, sequence_number))
+            raise UnexpectedResponseException(response, u"Block sequence number of response (0x%02x) does not match request block sequence number (0x%02x)" % (response.service_data.sequence_number_echo, sequence_number))
 
         return response
 
     @standard_error_management
     def request_transfer_exit(self, data=None):
-        """
+        u"""
         Informs the server that the client wants to stop the data transfer by sending a :ref:`RequestTransferExit<RequestTransferExit>` service request.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -858,7 +860,7 @@ class Client:
         :rtype: :ref:`Response<Response>`
         """
         request = services.RequestTransferExit.make_request(data)
-        self.logger.info('%s - Sending exit request' % (self.service_log_prefix(services.RequestTransferExit)))
+        self.logger.info(u'%s - Sending exit request' % (self.service_log_prefix(services.RequestTransferExit)))
 
         response = self.send_request(request)
         if response is None:
@@ -869,7 +871,7 @@ class Client:
 
     @standard_error_management
     def link_control(self, control_type, baudrate=None):
-        """
+        u"""
         Controls the communication baudrate by sending a :ref:`LinkControl<LinkControl>` service request.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -884,15 +886,15 @@ class Client:
         :rtype: :ref:`Response<Response>`
         """
         request = services.LinkControl.make_request(control_type, baudrate)
-        baudrate_str = 'No baudrate specified' if baudrate is None else 'Baudrate : ' + str(baudrate)
+        baudrate_str = u'No baudrate specified' if baudrate is None else u'Baudrate : ' + unicode(baudrate)
 
-        action = "Performing LinkControl request"
+        action = u"Performing LinkControl request"
         if control_type in [services.LinkControl.ControlType.verifyBaudrateTransitionWithFixedBaudrate, services.LinkControl.ControlType.verifyBaudrateTransitionWithSpecificBaudrate]:
-            action = "Verifiying support"
+            action = u"Verifiying support"
         elif   control_type == services.LinkControl.ControlType.transitionBaudrate:
-            action = "Switching"
+            action = u"Switching"
 
-        self.logger.info('%s - ControlType=0x%02x (%s) - %s for baudrate %s ' % (self.service_log_prefix(services.LinkControl), control_type, services.LinkControl.ControlType.get_name(control_type), action, baudrate_str))
+        self.logger.info(u'%s - ControlType=0x%02x (%s) - %s for baudrate %s ' % (self.service_log_prefix(services.LinkControl), control_type, services.LinkControl.ControlType.get_name(control_type), action, baudrate_str))
 
         response = self.send_request(request)
         if response is None:
@@ -900,13 +902,13 @@ class Client:
         services.LinkControl.interpret_response(response)
 
         if control_type != response.service_data.control_type_echo:
-            raise UnexpectedResponseException(response, "Control type of response (0x%02x) does not match request control type (0x%02x)" % (response.service_data.control_type_echo, control_type))
+            raise UnexpectedResponseException(response, u"Control type of response (0x%02x) does not match request control type (0x%02x)" % (response.service_data.control_type_echo, control_type))
 
         return response
 
     @standard_error_management
     def io_control(self, did, control_param=None, values=None, masks=None):
-        """
+        u"""
         Substitutes the value of an input signal or overrides the state of an output by sending a :ref:`InputOutputControlByIdentifier<InputOutputControlByIdentifier>` service request.
 
         :Effective configuration: ``exception_on_<type>_response`` ``input_output`` ``tolerate_zero_padding``
@@ -938,30 +940,30 @@ class Client:
         :return: The server response parsed by :meth:`InputOutputControlByIdentifier.interpret_response<udsoncan.services.InputOutputControlByIdentifier.interpret_response>`
         :rtype: :ref:`Response<Response>`
         """
-        if 'input_output' not in self.config:
-            raise ConfigError('input_output', msg='input_output must be defined in client configuration in order to use InputOutputControlByIdentifier service')
+        if u'input_output' not in self.config:
+            raise ConfigError(u'input_output', msg=u'input_output must be defined in client configuration in order to use InputOutputControlByIdentifier service')
 
-        request = services.InputOutputControlByIdentifier.make_request( did, control_param=control_param, values=values, masks=masks, ioconfig=self.config['input_output'])
+        request = services.InputOutputControlByIdentifier.make_request( did, control_param=control_param, values=values, masks=masks, ioconfig=self.config[u'input_output'])
 
-        control_param_str = 'no control parameter' if control_param is None else 'control parameter 0x%02x (%s)' % (control_param, services.InputOutputControlByIdentifier.ControlParam.get_name(control_param))		
-        self.logger.info('%s - Sending request for DID=0x%04x, %s.' % (self.service_log_prefix(services.InputOutputControlByIdentifier), did, control_param_str))
+        control_param_str = u'no control parameter' if control_param is None else u'control parameter 0x%02x (%s)' % (control_param, services.InputOutputControlByIdentifier.ControlParam.get_name(control_param))		
+        self.logger.info(u'%s - Sending request for DID=0x%04x, %s.' % (self.service_log_prefix(services.InputOutputControlByIdentifier), did, control_param_str))
 
         response = self.send_request(request)
         if response is None:
             return
-        services.InputOutputControlByIdentifier.interpret_response(response, control_param=control_param, tolerate_zero_padding=self.config['tolerate_zero_padding'], ioconfig=self.config['input_output'])
+        services.InputOutputControlByIdentifier.interpret_response(response, control_param=control_param, tolerate_zero_padding=self.config[u'tolerate_zero_padding'], ioconfig=self.config[u'input_output'])
 
         if response.service_data.did_echo != did:
-            raise UnexpectedResponseException(response, "Echo of the DID number (0x%04x) does not match the value in the request (0x%04x)" % (response.service_data.did_echo, did))
+            raise UnexpectedResponseException(response, u"Echo of the DID number (0x%04x) does not match the value in the request (0x%04x)" % (response.service_data.did_echo, did))
 
         if control_param != response.service_data.control_param_echo:
-            raise UnexpectedResponseException(response, 'Echo of the InputOutputControlParameter (0x%02x) does not match the value in the request (0x%02x)' % (response.service_data.control_param_echo, control_param))	
+            raise UnexpectedResponseException(response, u'Echo of the InputOutputControlParameter (0x%02x) does not match the value in the request (0x%02x)' % (response.service_data.control_param_echo, control_param))	
 
         return response
 
     @standard_error_management
     def control_dtc_setting(self, setting_type, data=None):
-        """
+        u"""
         Controls some settings related to the Diagnostic Trouble Codes by sending a :ref:`ControlDTCSetting<ControlDTCSetting>` service request. 
         It can enable/disable some DTCs or perform some ECU specific configuration.
 
@@ -978,15 +980,15 @@ class Client:
         """
         request = services.ControlDTCSetting.make_request(setting_type, data)
         data_len = 0 if data is None else len(data)
-        action = "Performing ControlDTCSetting request"
+        action = u"Performing ControlDTCSetting request"
         if setting_type == services.ControlDTCSetting.SettingType.on:
-            action = "Turning DTC On"
+            action = u"Turning DTC On"
         elif setting_type == services.ControlDTCSetting.SettingType.off:
-            action =  "Turning DTC Off"
+            action =  u"Turning DTC Off"
 
-        self.logger.info('%s - SettingType=0x%02x (%s) - %s with a payload of %d bytes' % (self.service_log_prefix(services.ControlDTCSetting), setting_type, services.ControlDTCSetting.SettingType.get_name(setting_type), action, data_len))
+        self.logger.info(u'%s - SettingType=0x%02x (%s) - %s with a payload of %d bytes' % (self.service_log_prefix(services.ControlDTCSetting), setting_type, services.ControlDTCSetting.SettingType.get_name(setting_type), action, data_len))
         if data is not None:
-            self.logger.debug("Payload of data : %s" % binascii.hexlify(data))
+            self.logger.debug(u"Payload of data : %s" % binascii.hexlify(data))
 
         response = self.send_request(request)
         if response is None:
@@ -995,13 +997,13 @@ class Client:
         services.ControlDTCSetting.interpret_response(response)
 
         if response.service_data.setting_type_echo != setting_type:
-            raise UnexpectedResponseException(response, "Setting type of response (0x%02x) does not match request control type (0x%02x)" % (response.service_data.setting_type_echo, setting_type))
+            raise UnexpectedResponseException(response, u"Setting type of response (0x%02x) does not match request control type (0x%02x)" % (response.service_data.setting_type_echo, setting_type))
 
         return response
 
     @standard_error_management
     def read_memory_by_address(self, memory_location):
-        """
+        u"""
         Reads a block of memory from the server by sending a :ref:`ReadMemoryByAddress<ReadMemoryByAddress>` service request. 
 
         :Effective configuration: ``exception_on_<type>_response`` ``server_address_format`` ``server_memorysize_format``
@@ -1013,16 +1015,16 @@ class Client:
         :rtype: :ref:`Response<Response>`
         """
         if not isinstance(memory_location, MemoryLocation):
-            raise ValueError('memory_location must be an instance of MemoryLocation')
+            raise ValueError(u'memory_location must be an instance of MemoryLocation')
 
-        if 'server_address_format' in self.config:
-            memory_location.set_format_if_none(address_format=self.config['server_address_format'])
+        if u'server_address_format' in self.config:
+            memory_location.set_format_if_none(address_format=self.config[u'server_address_format'])
 
-        if 'server_memorysize_format' in self.config:
-            memory_location.set_format_if_none(memorysize_format=self.config['server_memorysize_format'])
+        if u'server_memorysize_format' in self.config:
+            memory_location.set_format_if_none(memorysize_format=self.config[u'server_memorysize_format'])
 
         request = services.ReadMemoryByAddress.make_request(memory_location)
-        self.logger.info('%s - Reading memory address at %s' % (self.service_log_prefix(services.ReadMemoryByAddress), str(memory_location)))
+        self.logger.info(u'%s - Reading memory address at %s' % (self.service_log_prefix(services.ReadMemoryByAddress), unicode(memory_location)))
 
         response = self.send_request(request)
         if response is None:
@@ -1031,20 +1033,20 @@ class Client:
         memdata = response.service_data.memory_block
 
         if len(memdata) < memory_location.memorysize:
-            raise UnexpectedResponseException(response, 'Data block given by the server is too short. Client requested for %d bytes but only received %d bytes' % (memory_location.memorysize, len(response.data)))
+            raise UnexpectedResponseException(response, u'Data block given by the server is too short. Client requested for %d bytes but only received %d bytes' % (memory_location.memorysize, len(response.data)))
 
         if len(memdata) > memory_location.memorysize:
             extra_bytes = len(memdata) - memory_location.memorysize
-            if memdata[memory_location.memorysize:] == b'\x00' * extra_bytes and self.config['tolerate_zero_padding']:
+            if memdata[memory_location.memorysize:] == '\x00' * extra_bytes and self.config[u'tolerate_zero_padding']:
                 response.service_data.memory_block = memdata[0:memory_location.memorysize]	# trim exceeding zeros
             else:
-                raise UnexpectedResponseException(response, 'Data block given by the server is too long. Client requested for %d bytes but received %d bytes' % (memory_location.memorysize, len(response.data)))
+                raise UnexpectedResponseException(response, u'Data block given by the server is too long. Client requested for %d bytes but received %d bytes' % (memory_location.memorysize, len(response.data)))
 
         return response
 
     @standard_error_management
     def write_memory_by_address(self, memory_location, data):
-        """
+        u"""
         Writes a block of memory in the server by sending a :ref:`WriteMemoryByAddress<WriteMemoryByAddress>` service request. 
 
         :Effective configuration: ``exception_on_<type>_response`` ``server_address_format`` ``server_memorysize_format``
@@ -1060,19 +1062,19 @@ class Client:
         """
 
         if not isinstance(memory_location, MemoryLocation):
-            raise ValueError('memory_location must be an instance of MemoryLocation')
+            raise ValueError(u'memory_location must be an instance of MemoryLocation')
 
-        if 'server_address_format' in self.config:
-            memory_location.set_format_if_none(address_format=self.config['server_address_format'])
+        if u'server_address_format' in self.config:
+            memory_location.set_format_if_none(address_format=self.config[u'server_address_format'])
 
-        if 'server_memorysize_format' in self.config:
-            memory_location.set_format_if_none(memorysize_format=self.config['server_memorysize_format'])
+        if u'server_memorysize_format' in self.config:
+            memory_location.set_format_if_none(memorysize_format=self.config[u'server_memorysize_format'])
 
         request = services.WriteMemoryByAddress.make_request(memory_location, data)
-        self.logger.info('%s - Writing %d bytes to memory address at %s' % (self.service_log_prefix(services.WriteMemoryByAddress), len(data), str(memory_location)))
+        self.logger.info(u'%s - Writing %d bytes to memory address at %s' % (self.service_log_prefix(services.WriteMemoryByAddress), len(data), unicode(memory_location)))
 
         if len(data) != memory_location.memorysize:
-            self.logger.warning('%s: Given data block length (%d bytes) does not match MemoryLocation size (%d bytes)' % (self.service_log_prefix(services.WriteMemoryByAddress), len(data), memory_location.memorysize))
+            self.logger.warning(u'%s: Given data block length (%d bytes) does not match MemoryLocation size (%d bytes)' % (self.service_log_prefix(services.WriteMemoryByAddress), len(data), memory_location.memorysize))
 
         response = self.send_request(request)
         if response is None:
@@ -1085,19 +1087,19 @@ class Client:
 
         # We make sure that the echo from the server matches the request we sent.
         if response.service_data.alfid_echo != alfid_byte:
-            raise UnexpectedResponseException(response, 'AddressAndLengthFormatIdentifier echoed back by the server (0x%02X) does not match the one requested by the client (0x%02X)' % (response.service_data.alfid_echo, int(alfid_byte)) )
+            raise UnexpectedResponseException(response, u'AddressAndLengthFormatIdentifier echoed back by the server (0x%02X) does not match the one requested by the client (0x%02X)' % (response.service_data.alfid_echo, int(alfid_byte)) )
 
         if response.service_data.memory_location_echo.address != memory_location.address:
-            raise UnexpectedResponseException(response, 'Address echoed back by the server (0x%X) does not match the one requested by the client (0x%X)' % (response.service_data.memory_location_echo.address, memory_location.address) )
+            raise UnexpectedResponseException(response, u'Address echoed back by the server (0x%X) does not match the one requested by the client (0x%X)' % (response.service_data.memory_location_echo.address, memory_location.address) )
 
         if response.service_data.memory_location_echo.memorysize != memory_location.memorysize:
-            raise UnexpectedResponseException(response, 'Memory size echoed back by the server (0x%X) does not match the one requested by the client (0x%X)' % (response.service_data.memory_location_echo.memorysize, memory_location.memorysize) )
+            raise UnexpectedResponseException(response, u'Memory size echoed back by the server (0x%X) does not match the one requested by the client (0x%X)' % (response.service_data.memory_location_echo.memorysize, memory_location.memorysize) )
 
         return response
 
 # ====  ReadDTCInformation
     def get_dtc_by_status_mask(self, status_mask):
-        """
+        u"""
         Reads all the Diagnostic Trouble Codes that have a status matching the given mask. 
         The server will check all of its DTCs and if (Dtc.status & status_mask) != 0, then the DTCs match the filter and are sent back to the client.
 
@@ -1112,7 +1114,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportDTCByStatusMask, status_mask=status_mask)
 
     def get_emission_dtc_by_status_mask(self, status_mask):
-        """
+        u"""
         Reads the emission-related Diagnostic Trouble Codes that have a status matching the given mask.
         The server will check its emission-related DTCs and if (Dtc.status & status_mask) != 0, then the DTCs match the filter and are sent back to the client.
 
@@ -1127,7 +1129,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportEmissionsRelatedOBDDTCByStatusMask, status_mask=status_mask)
 
     def get_mirrormemory_dtc_by_status_mask(self, status_mask):
-        """
+        u"""
         Reads all the Diagnostic Trouble Codes stored in mirror memory that have a status matching the given mask. 
         The server will check all of its DTCs and if (Dtc.status & status_mask) != 0, then the DTCs match the filter and are sent back to the client.
 
@@ -1142,7 +1144,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportMirrorMemoryDTCByStatusMask, status_mask=status_mask)
 
     def get_dtc_by_status_severity_mask(self, status_mask, severity_mask):
-        """
+        u"""
         Reads all the Diagnostic Trouble Codes that have a status and a severity matching the given masks. 
         The server will check all of its DTCs and if ( (Dtc.status & status_mask) != 0 && (Dtc.severity & severity) !=0), then the DTCs match the filter and are sent back to the client.
 
@@ -1160,7 +1162,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportDTCBySeverityMaskRecord, status_mask=status_mask, severity_mask=severity_mask)
 
     def get_number_of_dtc_by_status_mask(self, status_mask):
-        """
+        u"""
         Gets the number of DTCs that match the specified status mask.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -1174,7 +1176,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportNumberOfDTCByStatusMask, status_mask=status_mask)
 
     def get_mirrormemory_number_of_dtc_by_status_mask(self, status_mask):
-        """
+        u"""
         Gets the number of DTCs that match the specified status mask in mirror memory.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -1188,7 +1190,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportNumberOfMirrorMemoryDTCByStatusMask, status_mask=status_mask)
 
     def get_number_of_emission_dtc_by_status_mask(self, status_mask):
-        """
+        u"""
         Gets the number of emission-related DTCs that match the specified status mask.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -1202,7 +1204,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportNumberOfEmissionsRelatedOBDDTCByStatusMask, status_mask=status_mask)
 
     def get_number_of_dtc_by_status_severity_mask(self, status_mask, severity_mask):
-        """
+        u"""
         Gets the number of DTCs that match the specified status mask and severity mask.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -1219,7 +1221,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportNumberOfDTCBySeverityMaskRecord, status_mask=status_mask, severity_mask=severity_mask)
 
     def get_dtc_severity(self, dtc):
-        """
+        u"""
         Requests the server for a specific DTC severity level.
 
         :Effective configuration: ``exception_on_<type>_response``
@@ -1233,7 +1235,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportSeverityInformationOfDTC, dtc=dtc)
 
     def get_supported_dtc(self):
-        """
+        u"""
         Requests the list of supported DTCs by the server.
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding`` ``ignore_all_zero_dtc``
@@ -1244,7 +1246,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportSupportedDTCs)
 
     def get_first_test_failed_dtc(self):
-        """
+        u"""
         Reads a single DTC. Requests the server for the first DTC that set its ``Dtc.Status.test_failed`` bit.
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding`` ``ignore_all_zero_dtc``
@@ -1255,7 +1257,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportFirstTestFailedDTC)
 
     def get_first_confirmed_dtc(self):
-        """
+        u"""
         Reads a single DTC. Requests the server for the first DTC that set its ``Dtc.Status.confirmed`` bit.
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding`` ``ignore_all_zero_dtc``
@@ -1266,7 +1268,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportFirstConfirmedDTC)
 
     def get_most_recent_test_failed_dtc(self):
-        """
+        u"""
         Reads a single DTC. Requests the server for the last DTC that set its ``Dtc.Status.test_failed`` bit.
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding`` ``ignore_all_zero_dtc``
@@ -1277,7 +1279,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportMostRecentTestFailedDTC)
 
     def get_most_recent_confirmed_dtc(self):
-        """
+        u"""
         Reads a single DTC. Requests the server for the last DTC that set its ``Dtc.Status.confirmed`` bit.
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding`` ``ignore_all_zero_dtc``
@@ -1288,7 +1290,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportMostRecentConfirmedDTC)
 
     def get_dtc_with_permanent_status(self):
-        """
+        u"""
         Returns all DTCs that the server marked as `permanent`. 
 
         A permanent DTC is a DTC stored in Non-Volatile memory and that cannot be erased by test equipment or by power-cycling the ECU.
@@ -1301,7 +1303,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportDTCWithPermanentStatus)
 
     def get_dtc_fault_counter(self):
-        """
+        u"""
         Requests the server for all DTCs that are `prefailed` along with their fault detection counter. 
 
         A prefailed DTC is a DTC for which the detection condition is met, but has not been identified as `pending` or `confirmed` yet. 
@@ -1317,7 +1319,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportDTCFaultDetectionCounter)
 
     def get_dtc_snapshot_identification(self):
-        """
+        u"""
         Requests the server to return an index of all the DTC snapshots available. The server will respond with a list of DTCs and a list of snapshot record numbers for each DTC.
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding`` ``ignore_all_zero_dtc``
@@ -1328,7 +1330,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportDTCSnapshotIdentification)
 
     def get_dtc_snapshot_by_dtc_number(self, dtc, record_number=0xFF):
-        """
+        u"""
         Requests the server for one or many specific DTC snapshots associated with a single DTC.
         Each snapshot has a data identifier associated with it. The data will be decoded using the associated :ref:`DidCodec<DidCodec>` defined in ``config['data_identifiers']``.
 
@@ -1346,7 +1348,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportDTCSnapshotRecordByDTCNumber, dtc=dtc, snapshot_record_number=record_number)
 
     def get_dtc_snapshot_by_record_number(self, record_number=0xFF):
-        """
+        u"""
         Requests the server for one or many DTC snapshots by specifying a record number. This functionality can exist only if the server assigns globally unique record_numbers to DTC snapshots, regardless of the DTC ID.
 
         Each snapshot has a data identifier associated with it. The data will be decoded using the associated :ref:`DidCodec<DidCodec>` defined in ``config['data_identifiers']``.
@@ -1362,7 +1364,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportDTCSnapshotRecordByRecordNumber, snapshot_record_number=record_number)
 
     def get_dtc_extended_data_by_dtc_number(self, dtc, record_number=0xFF, data_size = None):
-        """
+        u"""
         Requests the server for one or many DTC **extended data** by specifying a record number.
 
         The DTC extended data is an ECU specific set of data that is not associated with a data identifier. Given as ``bytes``
@@ -1384,7 +1386,7 @@ class Client:
         return self.read_dtc_information(services.ReadDTCInformation.Subfunction.reportDTCExtendedDataRecordByDTCNumber, dtc=dtc, extended_data_record_number=record_number,extended_data_size=data_size)
 
     def get_mirrormemory_dtc_extended_data_by_dtc_number(self, dtc, record_number=0xFF, data_size = None):
-        """
+        u"""
         Requests the server for one or many DTC **extended data** stored in mirror memory by specifying a record number.
 
         The DTC extended data is an ECU specific set of data that is not associated with a data identifier. Given as ``bytes``
@@ -1413,70 +1415,70 @@ class Client:
             dtc = dtc.id
 
         request_params = {
-                'subfunction' : subfunction,
-                'status_mask' : status_mask,
-                'severity_mask' : severity_mask,
-                'dtc' : dtc,
-                'snapshot_record_number' : snapshot_record_number,
-                'extended_data_record_number' : extended_data_record_number
+                u'subfunction' : subfunction,
+                u'status_mask' : status_mask,
+                u'severity_mask' : severity_mask,
+                u'dtc' : dtc,
+                u'snapshot_record_number' : snapshot_record_number,
+                u'extended_data_record_number' : extended_data_record_number
         }
 
         request = services.ReadDTCInformation.make_request(**request_params)
 
-        self.logger.info('%s - Sending request with subfunction "%s" (0x%02X).' % (self.service_log_prefix(services.ReadDTCInformation), services.ReadDTCInformation.Subfunction.get_name(subfunction), subfunction))
-        self.logger.debug('\tParams are : %s' % str(request_params))
+        self.logger.info(u'%s - Sending request with subfunction "%s" (0x%02X).' % (self.service_log_prefix(services.ReadDTCInformation), services.ReadDTCInformation.Subfunction.get_name(subfunction), subfunction))
+        self.logger.debug(u'\tParams are : %s' % unicode(request_params))
         response = self.send_request(request)
         if response is None:
             return
 
         response_params = {
-                'subfunction' : subfunction,
-                'tolerate_zero_padding' : self.config['tolerate_zero_padding'],
-                'ignore_all_zero_dtc' : self.config['ignore_all_zero_dtc'],
-                'dtc_snapshot_did_size' : self.config['dtc_snapshot_did_size'],
-                'didconfig' : self.config['data_identifiers'] if 'data_identifiers' in self.config else None,
-                'extended_data_size' : extended_data_size
+                u'subfunction' : subfunction,
+                u'tolerate_zero_padding' : self.config[u'tolerate_zero_padding'],
+                u'ignore_all_zero_dtc' : self.config[u'ignore_all_zero_dtc'],
+                u'dtc_snapshot_did_size' : self.config[u'dtc_snapshot_did_size'],
+                u'didconfig' : self.config[u'data_identifiers'] if u'data_identifiers' in self.config else None,
+                u'extended_data_size' : extended_data_size
         }
 
         if extended_data_size is None:
-            if 'extended_data_size' in self.config:
-                if dtc is not None and dtc in self.config['extended_data_size']:
-                    response_params['extended_data_size'] = self.config['extended_data_size'][dtc]
+            if u'extended_data_size' in self.config:
+                if dtc is not None and dtc in self.config[u'extended_data_size']:
+                    response_params[u'extended_data_size'] = self.config[u'extended_data_size'][dtc]
 
         services.ReadDTCInformation.interpret_response(response, **response_params)
 
         if response.service_data.subfunction_echo != subfunction:
-            raise UnexpectedResponseException(response, 'Echo of ReadDTCInformation subfunction gotten from server(0x%02x) does not match the value in the request subfunction (0x%02x)' % (response.service_data.subfunction_echo, subfunction))	
+            raise UnexpectedResponseException(response, u'Echo of ReadDTCInformation subfunction gotten from server(0x%02x) does not match the value in the request subfunction (0x%02x)' % (response.service_data.subfunction_echo, subfunction))	
 
         if subfunction == services.ReadDTCInformation.Subfunction.reportDTCSnapshotRecordByDTCNumber:
             if len(response.service_data.dtcs) == 1:
                 if dtc != response.service_data.dtcs[0].id:
-                    raise UnexpectedResponseException(response, 'Server returned snapshot with DTC ID 0x%06x while client requested for 0x%06x' % (response.service_data.dtcs[0].id, dtc))
+                    raise UnexpectedResponseException(response, u'Server returned snapshot with DTC ID 0x%06x while client requested for 0x%06x' % (response.service_data.dtcs[0].id, dtc))
 
         if subfunction in [services.ReadDTCInformation.Subfunction.reportDTCSnapshotRecordByRecordNumber, services.ReadDTCInformation.Subfunction.reportDTCSnapshotRecordByDTCNumber]:
             if len(response.service_data.dtcs) == 1 and snapshot_record_number != 0xFF:
                 for snapshot in response.service_data.dtcs[0].snapshots:
                     if snapshot.record_number != snapshot_record_number:
-                        raise UnexpectedResponseException(response, 'Server returned snapshot with record number 0x%02x while client requested for 0x%02x' % (snapshot.record_number, snapshot_record_number)) 
+                        raise UnexpectedResponseException(response, u'Server returned snapshot with record number 0x%02x while client requested for 0x%02x' % (snapshot.record_number, snapshot_record_number)) 
 
         if subfunction in [services.ReadDTCInformation.Subfunction.reportDTCExtendedDataRecordByDTCNumber, services.ReadDTCInformation.Subfunction.reportMirrorMemoryDTCExtendedDataRecordByDTCNumber]:
             if len(response.service_data.dtcs) == 1 and extended_data_record_number < 0xF0: # Standard specifies that values between 0xF0 and 0xFF are for reporting groups (more than one record)
                 for extended_data in response.service_data.dtcs[0].extended_data:
                     if extended_data.record_number != extended_data_record_number :	
-                        raise UnexpectedResponseException(response, 'Extended data record number given by the server (0x%02x) does not match the record number requested by the client (0x%02x)' % (extended_data.record_number, extended_data_record_number))
+                        raise UnexpectedResponseException(response, u'Extended data record number given by the server (0x%02x) does not match the record number requested by the client (0x%02x)' % (extended_data.record_number, extended_data_record_number))
 
         for dtc in response.service_data.dtcs:
             if dtc.fault_counter is not None and (dtc.fault_counter >= 0x7F or dtc.fault_counter < 0x01):
-                self.logger.warning('Server returned a fault counter value of 0x%02x for DTC id 0x%06x while value should be between 0x01 and 0x7E.' % (dtc.fault_counter, dtc.id))
+                self.logger.warning(u'Server returned a fault counter value of 0x%02x for DTC id 0x%06x while value should be between 0x01 and 0x7E.' % (dtc.fault_counter, dtc.id))
 
         if Dtc.Format.get_name(response.service_data.dtc_format) is None:
-            self.logger.warning('Unknown DTC Format Identifier 0x%02x. Value should be between 0 and 3' % response.service_data.dtc_format)
+            self.logger.warning(u'Unknown DTC Format Identifier 0x%02x. Value should be between 0 and 3' % response.service_data.dtc_format)
 
         return response
 
 
     def add_file(self, filename, dfi=None, filesize=None):
-        """
+        u"""
         Sends a RequestFileTransfer request with ModeOfOperation=AddFile(1).
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding``
@@ -1500,7 +1502,7 @@ class Client:
         return self.request_file_transfer(moop=services.RequestFileTransfer.ModeOfOperation.AddFile, path=filename, dfi=dfi, filesize=filesize)
 
     def delete_file(self, filename):
-        """
+        u"""
         Sends a RequestFileTransfer request with ModeOfOperation=DeleteFile(2).
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding``
@@ -1514,7 +1516,7 @@ class Client:
         return self.request_file_transfer(moop=services.RequestFileTransfer.ModeOfOperation.DeleteFile, path=filename)
     
     def replace_file(self, filename, dfi=None, filesize=None):
-        """
+        u"""
         Sends a RequestFileTransfer request with ModeOfOperation=ReplaceFile(3).
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding``
@@ -1538,7 +1540,7 @@ class Client:
         return self.request_file_transfer(moop=services.RequestFileTransfer.ModeOfOperation.ReplaceFile, path=filename, dfi=dfi, filesize=filesize)
    
     def read_file(self, filename, dfi=None):
-        """
+        u"""
         Sends a RequestFileTransfer request with ModeOfOperation=ReadFile(4).
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding``
@@ -1556,7 +1558,7 @@ class Client:
         return self.request_file_transfer(moop=services.RequestFileTransfer.ModeOfOperation.ReadFile, path=filename, dfi=dfi)
    
     def read_dir(self, path):
-        """
+        u"""
         Sends a RequestFileTransfer request with ModeOfOperation=ReadDir(5).
 
         :Effective configuration: ``exception_on_<type>_response`` ``tolerate_zero_padding``
@@ -1572,28 +1574,28 @@ class Client:
     @standard_error_management
     def request_file_transfer(self, moop, path, dfi=None, filesize=None):
         request = services.RequestFileTransfer.make_request(moop=moop, path=path, dfi=dfi, filesize=filesize)
-        self.logger.info('%s - Sending a "%s"(0x%02x) request on "%s". ' % (self.service_log_prefix(services.RequestFileTransfer), services.RequestFileTransfer.ModeOfOperation.get_name(moop), moop, path))
-        self.logger.debug("%s - DataFormatIdentifier = %s. Filesize = %s" % (self.service_log_prefix(services.RequestFileTransfer), dfi, filesize))
+        self.logger.info(u'%s - Sending a "%s"(0x%02x) request on "%s". ' % (self.service_log_prefix(services.RequestFileTransfer), services.RequestFileTransfer.ModeOfOperation.get_name(moop), moop, path))
+        self.logger.debug(u"%s - DataFormatIdentifier = %s. Filesize = %s" % (self.service_log_prefix(services.RequestFileTransfer), dfi, filesize))
        
         response = self.send_request(request)
         if response is None:
             return
         try:
-            services.RequestFileTransfer.interpret_response(response, tolerate_zero_padding = self.config['tolerate_zero_padding'])
-        except InvalidResponseException as e:
+            services.RequestFileTransfer.interpret_response(response, tolerate_zero_padding = self.config[u'tolerate_zero_padding'])
+        except InvalidResponseException, e:
             if e.response.service_data.moop_echo is not None and e.response.service_data.moop_echo != moop:
-                raise UnexpectedResponseException(e.response, 'ModeOfOperation echo does not match request and caused the service to failed decoding the payload correctly. Received 0x%02x, Requested=0x%02x' % (e.response.service_data.moop_echo, moop))    
+                raise UnexpectedResponseException(e.response, u'ModeOfOperation echo does not match request and caused the service to failed decoding the payload correctly. Received 0x%02x, Requested=0x%02x' % (e.response.service_data.moop_echo, moop))    
             else:
                 raise e
 
         if response.service_data.moop_echo != moop:
-            raise UnexpectedResponseException(response, 'ModeOfOperation echo does not match request. Received 0x%02x, Requested=0x%02x' % (response.service_data.moop_echo, moop))
+            raise UnexpectedResponseException(response, u'ModeOfOperation echo does not match request. Received 0x%02x, Requested=0x%02x' % (response.service_data.moop_echo, moop))
 
         if response.service_data.dfi is not None and dfi is not None:
             received = response.service_data.dfi.get_byte_as_int()
             expected = dfi.get_byte_as_int()
             if received != expected:
-                raise UnexpectedResponseException(response, 'DataFormatIdentifier echo does not match request. Received 0x%02x, Requested=0x%02x' % (received, expected))
+                raise UnexpectedResponseException(response, u'DataFormatIdentifier echo does not match request. Received 0x%02x, Requested=0x%02x' % (received, expected))
 
         return response
 
@@ -1601,8 +1603,8 @@ class Client:
     def send_request(self, request, timeout=-1):
         if timeout < 0:
             # Timeout not provided by user: defaults to Client request_timeout value
-            overall_timeout = self.config['request_timeout']
-            p2 = self.config['p2_timeout'] if self.session_timing['p2_server_max'] is None else self.session_timing['p2_server_max']
+            overall_timeout = self.config[u'request_timeout']
+            p2 = self.config[u'p2_timeout'] if self.session_timing[u'p2_server_max'] is None else self.session_timing[u'p2_server_max']
             single_request_timeout = min(overall_timeout, p2)
         else:
             overall_timeout = timeout
@@ -1611,7 +1613,7 @@ class Client:
         using_p2_star = False	# Will switch to true when Nrc 0x78 will be received the first time.
 
         self.conn.empty_rxqueue()
-        self.logger.debug("Sending request to server")
+        self.logger.debug(u"Sending request to server")
         override_suppress_positive_response = False
         if self.suppress_positive_response.enabled == True and request.service.use_subfunction():
             payload = request.get_payload(suppress_positive_response=True)
@@ -1623,7 +1625,7 @@ class Client:
             payload = self.payload_override.get_overrided_payload(payload)
 
         if self.suppress_positive_response.enabled and not request.service.use_subfunction():
-            self.logger.warning('SuppressPositiveResponse cannot be used for service %s. Ignoring' % (request.service.get_name()))
+            self.logger.warning(u'SuppressPositiveResponse cannot be used for service %s. Ignoring' % (request.service.get_name()))
 
         self.conn.send(payload)
 
@@ -1634,53 +1636,53 @@ class Client:
 
         while not done_receiving:
             done_receiving = True
-            self.logger.debug("Waiting for server response")
+            self.logger.debug(u"Waiting for server response")
 
             try:
                 if time.time() + single_request_timeout < overall_timeout_time:	
-                    timeout_type_used 	= 'single_request'
+                    timeout_type_used 	= u'single_request'
                     timeout_value 		= single_request_timeout
                 else:	
-                    timeout_type_used 	= 'overall'
+                    timeout_type_used 	= u'overall'
                     timeout_value 		= max(overall_timeout_time - time.time(), 0)
 
                 payload = self.conn.wait_frame(timeout=timeout_value, exception=True)	
             except TimeoutException:
-                if timeout_type_used == 'single_request':
-                    timeout_name_to_report = 'P2* timeout' if using_p2_star else 'P2 timeout'
-                elif timeout_type_used == 'overall':
-                    timeout_name_to_report = 'Global request timeout'
+                if timeout_type_used == u'single_request':
+                    timeout_name_to_report = u'P2* timeout' if using_p2_star else u'P2 timeout'
+                elif timeout_type_used == u'overall':
+                    timeout_name_to_report = u'Global request timeout'
                 else:	# Shouldn't go here.
-                    timeout_name_to_report = 'Timeout'
-                raise TimeoutException('Did not receive response in time. %s time has expired (timeout=%.3f sec)' % (timeout_name_to_report, timeout_value))
-            except Exception as e:
+                    timeout_name_to_report = u'Timeout'
+                raise TimeoutException(u'Did not receive response in time. %s time has expired (timeout=%.3f sec)' % (timeout_name_to_report, timeout_value))
+            except Exception, e:
                 raise e
 
             response = Response.from_payload(payload)
             self.last_response = response
-            self.logger.debug("Received response from server")
+            self.logger.debug(u"Received response from server")
 
             if not response.valid:
                 raise InvalidResponseException(response)
 
             if response.service.response_id() != request.service.response_id():
-                msg = "Response gotten from server has a service ID different than the request service ID. Received=0x%02x, Expected=0x%02x" % (response.service.response_id() , request.service.response_id() )
+                msg = u"Response gotten from server has a service ID different than the request service ID. Received=0x%02x, Expected=0x%02x" % (response.service.response_id() , request.service.response_id() )
                 raise UnexpectedResponseException(response, msg)
 
             if not response.positive:
                 if not request.service.is_supported_negative_response(response.code):
-                    self.logger.warning('Given response code "%s" (0x%02x) is not a supported negative response code according to UDS standard.' % (response.code_name, response.code))
+                    self.logger.warning(u'Given response code "%s" (0x%02x) is not a supported negative response code according to UDS standard.' % (response.code_name, response.code))
 
                 if response.code == Response.Code.RequestCorrectlyReceived_ResponsePending:
                     done_receiving = False
                     if not using_p2_star:
                         # Received a 0x78 NRC: timeout is now set to P2*
-                        p2_star = self.config['p2_star_timeout'] if self.session_timing['p2_star_server_max'] is None else self.session_timing['p2_star_server_max']
+                        p2_star = self.config[u'p2_star_timeout'] if self.session_timing[u'p2_star_server_max'] is None else self.session_timing[u'p2_star_server_max']
                         single_request_timeout = p2_star
                         using_p2_star = True
-                        self.logger.debug("Server requested to wait with response code %s (0x%02x), single request timeout is now set to P2* (%.3f seconds)" % (response.code_name, response.code, single_request_timeout))
+                        self.logger.debug(u"Server requested to wait with response code %s (0x%02x), single request timeout is now set to P2* (%.3f seconds)" % (response.code_name, response.code, single_request_timeout))
                 else:
                     raise NegativeResponseException(response)
 
-        self.logger.info('Received positive response for service %s (0x%02x) from server.' % (response.service.get_name(), response.service.request_id()))
+        self.logger.info(u'Received positive response for service %s (0x%02x) from server.' % (response.service.get_name(), response.service.request_id()))
         return response

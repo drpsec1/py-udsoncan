@@ -1,41 +1,44 @@
+from __future__ import absolute_import
 import socket
-import queue
+import Queue
 import threading
 import logging
 import binascii
 import sys
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 import functools
 import time
 
 try:
     import can
     _import_can_err = None
-except Exception as e:
+except Exception, e:
     _import_can_err = e
 
 try:
     import isotp
     _import_isotp_err = None
-except Exception as e:
+except Exception, e:
     _import_isotp_err = e
 
 from udsoncan.Request import Request
 from udsoncan.Response import Response
 from udsoncan.exceptions import TimeoutException
 
+ABC = ABCMeta(str('ABC'), (), {})
+
 class BaseConnection(ABC):
 
     def __init__(self, name=None):
         if name is None:
-            self.name = 'Connection'
+            self.name = u'Connection'
         else:
-            self.name = 'Connection[%s]' % (name)
+            self.name = u'Connection[%s]' % (name)
 
         self.logger = logging.getLogger(self.name)
 
     def send(self, data):
-        """Sends data to the underlying transport protocol
+        u"""Sends data to the underlying transport protocol
 
         :param data: The data or object to send. If a Request or Response is given, the value returned by get_payload() will be sent.
         :type data: bytes, Request, Response
@@ -48,11 +51,11 @@ class BaseConnection(ABC):
         else :
             payload = data
 
-        self.logger.debug('Sending %d bytes : [%s]' % (len(payload), binascii.hexlify(payload) ))
+        self.logger.debug(u'Sending %d bytes : [%s]' % (len(payload), binascii.hexlify(payload) ))
         self.specific_send(payload)
 
     def wait_frame(self, timeout=2, exception=False):
-        """Waits for the reception of a frame of data from the underlying transport protocol
+        u"""Waits for the reception of a frame of data from the underlying transport protocol
 
         :param timeout: The maximum amount of time to wait before giving up in seconds
         :type timeout: int
@@ -66,8 +69,8 @@ class BaseConnection(ABC):
         """
         try:
             frame = self.specific_wait_frame(timeout=timeout)
-        except Exception as e:
-            self.logger.debug('No data received: [%s] - %s ' % (e.__class__.__name__, str(e)))
+        except Exception, e:
+            self.logger.debug(u'No data received: [%s] - %s ' % (e.__class__.__name__, unicode(e)))
 
             if exception == True:
                 raise
@@ -75,7 +78,7 @@ class BaseConnection(ABC):
                 frame = None
 
         if frame is not None:
-            self.logger.debug('Received %d bytes : [%s]' % (len(frame), binascii.hexlify(frame) ))
+            self.logger.debug(u'Received %d bytes : [%s]' % (len(frame), binascii.hexlify(frame) ))
         return frame
 
     def __enter__(self):
@@ -83,7 +86,7 @@ class BaseConnection(ABC):
 
     @abstractmethod
     def specific_send(self, payload):
-        """The implementation of the send method.
+        u"""The implementation of the send method.
 
         :param payload: Data to send
         :type payload: bytes
@@ -94,7 +97,7 @@ class BaseConnection(ABC):
 
     @abstractmethod
     def specific_wait_frame(self, timeout=2):
-        """The implementation of the ``wait_frame`` method. 
+        u"""The implementation of the ``wait_frame`` method. 
 
         :param timeout: The maximum amount of time to wait before giving up
         :type timeout: int
@@ -106,7 +109,7 @@ class BaseConnection(ABC):
 
     @abstractmethod
     def open(self):
-        """ Set up the connection object. 
+        u""" Set up the connection object. 
 
         :returns: None
         """
@@ -114,7 +117,7 @@ class BaseConnection(ABC):
 
     @abstractmethod
     def close(self):
-        """ Close the connection object
+        u""" Close the connection object
 
         :returns: None
         """
@@ -122,7 +125,7 @@ class BaseConnection(ABC):
 
     @abstractmethod
     def empty_rxqueue(self):
-        """ Empty all unread data in the reception buffer.
+        u""" Empty all unread data in the reception buffer.
 
         :returns: None
         """
@@ -133,7 +136,7 @@ class BaseConnection(ABC):
 
 
 class SocketConnection(BaseConnection):
-    """
+    u"""
     Sends and receives data through a socket.
 
     :param sock: The socket to use. This socket must be bound and ready to use. Only ``send()`` and ``recv()`` will be called by this Connection
@@ -147,7 +150,7 @@ class SocketConnection(BaseConnection):
     def __init__(self, sock, bufsize=4095, name=None):
         BaseConnection.__init__(self, name)
 
-        self.rxqueue = queue.Queue()
+        self.rxqueue = Queue.Queue()
         self.exit_requested = False
         self.opened = False
         self.rxthread = None
@@ -161,7 +164,7 @@ class SocketConnection(BaseConnection):
         self.rxthread = threading.Thread(target=self.rxthread_task)
         self.rxthread.start()
         self.opened = True
-        self.logger.info('Connection opened')
+        self.logger.info(u'Connection opened')
         return self
 
     def __enter__(self):
@@ -189,25 +192,25 @@ class SocketConnection(BaseConnection):
         self.exit_requested = True
         self.rxthread.join()
         self.opened = False
-        self.logger.info('Connection closed')
+        self.logger.info(u'Connection closed')
 
     def specific_send(self, payload):
         self.sock.send(payload)
 
     def specific_wait_frame(self, timeout=2):
         if not self.opened:
-            raise RuntimeError("Connection is not open")
+            raise RuntimeError(u"Connection is not open")
 
         timedout = False
         frame = None
         try:
             frame = self.rxqueue.get(block=True, timeout=timeout)
 
-        except queue.Empty:
+        except Queue.Empty:
             timedout = True
 
         if timedout:
-            raise TimeoutException("Did not received frame in time (timeout=%s sec)" % timeout)
+            raise TimeoutException(u"Did not received frame in time (timeout=%s sec)" % timeout)
 
         return frame
 
@@ -218,7 +221,7 @@ class SocketConnection(BaseConnection):
 
 
 class IsoTPSocketConnection(BaseConnection):
-    """
+    u"""
     Sends and receives data through an ISO-TP socket. Makes cleaner code than SocketConnection but offers no additional functionality.
     The `can-isotp module <https://github.com/pylessard/python-can-isotp>`_ must be installed in order to use this connection
 
@@ -245,16 +248,16 @@ class IsoTPSocketConnection(BaseConnection):
         self.interface=interface
         self.rxid=rxid
         self.txid=txid
-        self.rxqueue = queue.Queue()
+        self.rxqueue = Queue.Queue()
         self.exit_requested = False
         self.opened = False
         self.tpsock_bind_args = args
         self.tpsock_bind_kwargs = kwargs
 
         if tpsock is None:
-            if 'isotp' not in sys.modules:
+            if u'isotp' not in sys.modules:
                 if _import_isotp_err is None:
-                    raise ImportError('isotp module is not loaded')
+                    raise ImportError(u'isotp module is not loaded')
                 else:
                     raise _import_isotp_err
             self.tpsock = isotp.socket(timeout=0.1)
@@ -268,7 +271,7 @@ class IsoTPSocketConnection(BaseConnection):
         self.rxthread = threading.Thread(target=self.rxthread_task)
         self.rxthread.start()
         self.opened = True
-        self.logger.info('Connection opened')
+        self.logger.info(u'Connection opened')
         return self
 
     def __enter__(self):
@@ -297,25 +300,25 @@ class IsoTPSocketConnection(BaseConnection):
         self.rxthread.join()
         self.tpsock.close()
         self.opened = False
-        self.logger.info('Connection closed')
+        self.logger.info(u'Connection closed')
 
     def specific_send(self, payload):
         self.tpsock.send(payload)
 
     def specific_wait_frame(self, timeout=2):
         if not self.opened:
-            raise RuntimeError("Connection is not open")
+            raise RuntimeError(u"Connection is not open")
 
         timedout = False
         frame = None
         try:
             frame = self.rxqueue.get(block=True, timeout=timeout)
 
-        except queue.Empty:
+        except Queue.Empty:
             timedout = True
 
         if timedout:
-            raise TimeoutException("Did not received ISOTP frame in time (timeout=%s sec)" % timeout)
+            raise TimeoutException(u"Did not received ISOTP frame in time (timeout=%s sec)" % timeout)
 
         return frame
 
@@ -325,13 +328,13 @@ class IsoTPSocketConnection(BaseConnection):
 
 
 class IsoTPConnection(IsoTPSocketConnection):
-    """
+    u"""
     Same as :class:`IsoTPSocketConnection <udsoncan.connections.IsoTPSocketConnection.Session>`. Exists only for backward compatibility. 
     """
     pass
 
 class QueueConnection(BaseConnection):
-    """
+    u"""
     Sends and receives data using 2 Python native queues.
 
     - ``MyConnection.fromuserqueue`` : Data read from this queue when ``wait_frame`` is called
@@ -346,14 +349,14 @@ class QueueConnection(BaseConnection):
     def __init__(self, name=None, mtu=4095):
         BaseConnection.__init__(self, name)
 
-        self.fromuserqueue = queue.Queue()	# Client reads from this queue. Other end is simulated
-        self.touserqueue = queue.Queue()	# Client writes to this queue. Other end is simulated
+        self.fromuserqueue = Queue.Queue()	# Client reads from this queue. Other end is simulated
+        self.touserqueue = Queue.Queue()	# Client writes to this queue. Other end is simulated
         self.opened = False
         self.mtu = mtu
 
     def open(self):
         self.opened = True
-        self.logger.info('Connection opened')
+        self.logger.info(u'Connection opened')
         return self
 
     def __enter__(self):
@@ -369,33 +372,33 @@ class QueueConnection(BaseConnection):
         self.empty_rxqueue()
         self.empty_txqueue()
         self.opened = False
-        self.logger.info('Connection closed')	
+        self.logger.info(u'Connection closed')	
 
     def specific_send(self, payload):
         if self.mtu is not None:
             if len(payload) > self.mtu:
-                self.logger.warning("Truncating payload to be set to a length of %d" % (self.mtu))
+                self.logger.warning(u"Truncating payload to be set to a length of %d" % (self.mtu))
                 payload = payload[0:self.mtu]
 
         self.touserqueue.put(payload)
 
     def specific_wait_frame(self, timeout=2):
         if not self.opened:
-            raise RuntimeError("Connection is not open")
+            raise RuntimeError(u"Connection is not open")
 
         timedout = False
         frame = None
         try:
             frame = self.fromuserqueue.get(block=True, timeout=timeout)
-        except queue.Empty:
+        except Queue.Empty:
             timedout = True
 
         if timedout:
-            raise TimeoutException("Did not receive frame from user queue in time (timeout=%s sec)" % timeout)
+            raise TimeoutException(u"Did not receive frame from user queue in time (timeout=%s sec)" % timeout)
 
         if self.mtu is not None:
             if frame is not None and len(frame) > self.mtu:
-                self.logger.warning("Truncating received payload to a length of %d" % (self.mtu))
+                self.logger.warning(u"Truncating received payload to a length of %d" % (self.mtu))
                 frame = frame[0:self.mtu]
 
         return frame
@@ -410,7 +413,7 @@ class QueueConnection(BaseConnection):
 
 
 class PythonIsoTpConnection(BaseConnection):
-    """
+    u"""
     Sends and receives data using a `can-isotp <https://github.com/pylessard/python-can-isotp>`_ Python module which is a Python implementation of the IsoTp transport protocol
     which can be coupled with `python-can <https://python-can.readthedocs.io>`_ module to interract with CAN hardware
 
@@ -429,14 +432,14 @@ class PythonIsoTpConnection(BaseConnection):
 
     def __init__(self, isotp_layer, name=None):
         BaseConnection.__init__(self, name)
-        self.toIsoTPQueue = queue.Queue()
-        self.fromIsoTPQueue = queue.Queue()	
+        self.toIsoTPQueue = Queue.Queue()
+        self.fromIsoTPQueue = Queue.Queue()	
         self.rxthread = None
         self.exit_requested = False
         self.opened = False
         self.isotp_layer = isotp_layer
 
-        assert isinstance(self.isotp_layer, isotp.TransportLayer) , 'isotp_layer must be a valid isotp.TransportLayer '
+        assert isinstance(self.isotp_layer, isotp.TransportLayer) , u'isotp_layer must be a valid isotp.TransportLayer '
 
     def open(self, bus=None):
         if bus is not None:
@@ -446,7 +449,7 @@ class PythonIsoTpConnection(BaseConnection):
         self.rxthread = threading.Thread(target=self.rxthread_task)
         self.rxthread.start()
         self.opened = True
-        self.logger.info('Connection opened')
+        self.logger.info(u'Connection opened')
         return self
 
     def __enter__(self):
@@ -465,36 +468,36 @@ class PythonIsoTpConnection(BaseConnection):
         self.rxthread.join()
         self.isotp_layer.reset()
         self.opened = False
-        self.logger.info('Connection closed')	
+        self.logger.info(u'Connection closed')	
 
     def specific_send(self, payload):
         if self.mtu is not None:
             if len(payload) > self.mtu:
-                self.logger.warning("Truncating payload to be set to a length of %d" % (self.mtu))
+                self.logger.warning(u"Truncating payload to be set to a length of %d" % (self.mtu))
                 payload = payload[0:self.mtu]
 
         self.toIsoTPQueue.put(bytearray(payload)) # isotp.protocol.TransportLayer uses byte array. udsoncan is strict on bytes format
 
     def specific_wait_frame(self, timeout=2):
         if not self.opened:
-            raise RuntimeError("Connection is not open")
+            raise RuntimeError(u"Connection is not open")
 
         timedout = False
         frame = None
         try:
             frame = self.fromIsoTPQueue.get(block=True, timeout=timeout)
-        except queue.Empty:
+        except Queue.Empty:
             timedout = True
 
         if timedout:
-            raise TimeoutException("Did not receive frame IsoTP Transport layer in time (timeout=%s sec)" % timeout)
+            raise TimeoutException(u"Did not receive frame IsoTP Transport layer in time (timeout=%s sec)" % timeout)
 
         if self.mtu is not None:
             if frame is not None and len(frame) > self.mtu:
-                self.logger.warning("Truncating received payload to a length of %d" % (self.mtu))
+                self.logger.warning(u"Truncating received payload to a length of %d" % (self.mtu))
                 frame = frame[0:self.mtu]
 
-        return bytes(frame)	# isotp.protocol.TransportLayer uses bytearray. udsoncan is strict on bytes format
+        return str(frame)	# isotp.protocol.TransportLayer uses bytearray. udsoncan is strict on bytes format
 
     def empty_rxqueue(self):
         while not self.fromIsoTPQueue.empty():
@@ -517,6 +520,6 @@ class PythonIsoTpConnection(BaseConnection):
 
                 time.sleep(self.isotp_layer.sleep_time())
 
-            except Exception as e:
+            except Exception, e:
                 self.exit_requested = True
-                self.logger.error(str(e))
+                self.logger.error(unicode(e))

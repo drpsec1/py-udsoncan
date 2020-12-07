@@ -1,8 +1,19 @@
+from __future__ import absolute_import
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
 import inspect
 import sys
-from abc import ABC
+from abc import ABCMeta
+
+ABC = ABCMeta(str('ABC'), (), {})
+
+def to_bytes(n, length, endianess='big'):
+    u"""
+    https://stackoverflow.com/questions/16022556/has-python-3-to-bytes-been-back-ported-to-python-2-7
+    """
+    h = '%x' % n
+    s = ('0'*(len(h) % 2) + h).zfill(length*2).decode('hex')
+    return s if endianess == 'big' else s[::-1]
 
 def cls_from_request_id(given_id):
     return BaseService.from_request_id(given_id)
@@ -10,22 +21,22 @@ def cls_from_request_id(given_id):
 def cls_from_response_id(given_id):
     return BaseService.from_response_id(given_id)
 
-class BaseSubfunction:
+class BaseSubfunction(object):
 
     @classmethod
     def get_name(cls, subfn_id):
         attributes = inspect.getmembers(cls, lambda a:not(inspect.isroutine(a)))
-        subfn_list = [a for a in attributes if not(a[0].startswith('__') and a[0].endswith('__'))]
+        subfn_list = [a for a in attributes if not(a[0].startswith(u'__') and a[0].endswith(u'__'))]
 
         for subfn in subfn_list:
-            if isinstance(subfn[1], int):
+            if isinstance(subfn[1], (int, long)):
                 if subfn[1] == subfn_id:	# [1] is value
                     return subfn[0] 		# [0] is property name
             elif isinstance(subfn[1], tuple):
                 if subfn_id >= subfn[1][0] or subfn_id <= subfn[1][1]:
                     return subfn[0] 
-        name = cls.__name__ if not hasattr(cls, '__pretty_name__') else cls.__pretty_name__
-        return 'Custom %s' % name
+        name = cls.__name__ if not hasattr(cls, u'__pretty_name__') else cls.__pretty_name__
+        return u'Custom %s' % name
 
 class BaseService(ABC):
 
@@ -52,7 +63,7 @@ class BaseService(ABC):
     @classmethod	# Returns an instance of the service identified by the service ID (Request)
     def from_request_id(cls, given_id):
         for name, obj in inspect.getmembers(sys.modules[__name__]):
-            if hasattr(obj, "__bases__") and cls in obj.__bases__:
+            if hasattr(obj, u"__bases__") and cls in obj.__bases__:
                 if obj.request_id() == given_id:
                     return obj
 
@@ -60,7 +71,7 @@ class BaseService(ABC):
     def from_response_id(cls, given_id):
 
         for name, obj in inspect.getmembers(sys.modules[__name__]):
-            if hasattr(obj, "__bases__") and cls in obj.__bases__:
+            if hasattr(obj, u"__bases__") and cls in obj.__bases__:
                 if obj.response_id() == int(given_id):
                     return obj
 
@@ -70,13 +81,13 @@ class BaseService(ABC):
 
     @classmethod	# Tells if this service includes a subfunction byte
     def use_subfunction(cls):
-        if hasattr(cls, '_use_subfunction'):
+        if hasattr(cls, u'_use_subfunction'):
             return cls._use_subfunction
         else:
             return True
     @classmethod
     def has_response_data(cls):
-        if hasattr(cls, '_no_response_data'):
+        if hasattr(cls, u'_no_response_data'):
             return False if cls._no_response_data else True
         else:
             return True
@@ -107,25 +118,25 @@ class BaseService(ABC):
 def is_valid_service(service_cls):
     return issubclass(service_cls, BaseService)
 
-class ServiceHelper:
+class ServiceHelper(object):
 
     @staticmethod
-    def validate_int(value, min=0, max=0xFF, name='value'):
-        if not isinstance(value, int):
-            raise ValueError("%s must be a valid integer" % (name))
+    def validate_int(value, min=0, max=0xFF, name=u'value'):
+        if not isinstance(value, (int, long)):
+            raise ValueError(u"%s must be a valid integer" % (name))
         if value < min or value > max:
-            raise ValueError("%s must be an integer between 0x%X and 0x%X" % (name, min, max))
+            raise ValueError(u"%s must be an integer between 0x%X and 0x%X" % (name, min, max))
 
     # Make sure that the actual client configuration contains valid definitions for given Data Identifiers
     @staticmethod
     def check_did_config(didlist, didconfig):
         didlist = [didlist] if not isinstance(didlist, list) else didlist
-        if 'data_identifiers' in didconfig:
-            didconfig = config['data_identifiers']
+        if u'data_identifiers' in didconfig:
+            didconfig = config[u'data_identifiers']
 
         for did in didlist:
             if did not in didconfig:
-                raise ConfigError(did, msg='Actual data identifier configuration contains no definition for data identifier 0x%04x' % did)
+                raise ConfigError(did, msg=u'Actual data identifier configuration contains no definition for data identifier 0x%04x' % did)
 
         return didconfig
 
@@ -133,53 +144,53 @@ class ServiceHelper:
     @staticmethod
     def check_io_config(didlist, ioconfig):
         didlist = [didlist] if not isinstance(didlist, list) else didlist
-        if 'input_output' in ioconfig:
-            ioconfig = ioconfig['input_output']
+        if u'input_output' in ioconfig:
+            ioconfig = ioconfig[u'input_output']
 
         if not isinstance(ioconfig, dict):
-            raise ConfigError('input_output', msg='Configuration of Input/Output section must be a dict.')
+            raise ConfigError(u'input_output', msg=u'Configuration of Input/Output section must be a dict.')
 
         for did in didlist:
             if did not in ioconfig:
-                raise ConfigError(key=did, msg='Actual Input/Output configuration contains no definition for data identifier 0x%04x' % did)
+                raise ConfigError(key=did, msg=u'Actual Input/Output configuration contains no definition for data identifier 0x%04x' % did)
             if isinstance(ioconfig[did], dict):	# IO Control services has that concept of composite DID. We define them with dicts.
-                if 'codec'not in ioconfig[did]:
-                    raise ConfigError('codec', msg='Configuration for Input/Output identifier 0x%04x is missing a codec')
+                if u'codec'not in ioconfig[did]:
+                    raise ConfigError(u'codec', msg=u'Configuration for Input/Output identifier 0x%04x is missing a codec')
 
-                if 'mask' in ioconfig[did]:
-                    mask_def = ioconfig[did]['mask']
+                if u'mask' in ioconfig[did]:
+                    mask_def = ioconfig[did][u'mask']
                     for mask_name in mask_def:
-                        if not isinstance(mask_def[mask_name], int):
-                            raise ValueError('In Input/Output configuration for did 0x%04x, mask "%s" is not an integer' % (did, mask_name))
+                        if not isinstance(mask_def[mask_name], (int, long)):
+                            raise ValueError(u'In Input/Output configuration for did 0x%04x, mask "%s" is not an integer' % (did, mask_name))
 
                         if mask_def[mask_name] < 0:
-                            raise ValueError('In Input/Output configuration for did 0x%04x, mask "%s" is not a positive integer' % (did, mask_name))
+                            raise ValueError(u'In Input/Output configuration for did 0x%04x, mask "%s" is not a positive integer' % (did, mask_name))
 
 
-                if 'mask_size' in ioconfig[did]:
-                    if not isinstance(ioconfig[did]['mask_size'], int):
-                        raise ValueError('mask_size in Input/Output configuration for did 0x%04x must be a valid integer' % (did))
+                if u'mask_size' in ioconfig[did]:
+                    if not isinstance(ioconfig[did][u'mask_size'], (int, long)):
+                        raise ValueError(u'mask_size in Input/Output configuration for did 0x%04x must be a valid integer' % (did))
 
-                    if ioconfig[did]['mask_size'] < 0:
-                        raise ValueError('mask_size in Input/Output configuration for did 0x%04x must be greater than 0' % (did))
+                    if ioconfig[did][u'mask_size'] < 0:
+                        raise ValueError(u'mask_size in Input/Output configuration for did 0x%04x must be greater than 0' % (did))
 
-                    if 'mask' in ioconfig[did]:
-                        mask_def = ioconfig[did]['mask']
+                    if u'mask' in ioconfig[did]:
+                        mask_def = ioconfig[did][u'mask']
                         for mask_name in mask_def:
-                            if mask_def[mask_name] > 2**(ioconfig[did]['mask_size']*8)-1:
-                                raise ValueError('In Input/Output configuration for did 0x%04x, mask "%s" cannot fit in %d bytes (defined by mask_size)' % (did, mask_name,ioconfig[did]['mask_size']))
+                            if mask_def[mask_name] > 2**(ioconfig[did][u'mask_size']*8)-1:
+                                raise ValueError(u'In Input/Output configuration for did 0x%04x, mask "%s" cannot fit in %d bytes (defined by mask_size)' % (did, mask_name,ioconfig[did][u'mask_size']))
 
         return ioconfig
 
-class BaseResponseData:
+class BaseResponseData(object):
     def __init__(self, service_class):
         if not issubclass(service_class, BaseService):
-            raise ValueError('service_class must be a service class')
+            raise ValueError(u'service_class must be a service class')
 
         self.service_class = service_class
 
     def __repr__(self):
-        return '<%s (%s) at 0x%08x>' % (self.__class__.__name__, self.service_class.__name__, id(self))
+        return u'<%s (%s) at 0x%08x>' % (self.__class__.__name__, self.service_class.__name__, id(self))
 
 from .DiagnosticSessionControl import DiagnosticSessionControl
 from .ECUReset import ECUReset

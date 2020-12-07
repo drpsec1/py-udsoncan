@@ -1,3 +1,5 @@
+from __future__ import division
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -12,10 +14,10 @@ class DiagnosticSessionControl(BaseService):
                                                                     Response.Code.ConditionsNotCorrect
                                                                     ]
     class Session(BaseSubfunction):
-        """
+        u"""
         DiagnosticSessionControl defined subfunctions
         """		
-        __pretty_name__ = 'session'	
+        __pretty_name__ = u'session'	
 
         defaultSession = 1
         programmingSession = 2
@@ -24,7 +26,7 @@ class DiagnosticSessionControl(BaseService):
 
     @classmethod
     def make_request(cls, session):
-        """
+        u"""
         Generates a request for DiagnosticSessionControl service
 
         :param session: Service subfunction. Allowed values are from 0 to 0x7F
@@ -34,12 +36,12 @@ class DiagnosticSessionControl(BaseService):
         """
 
         from udsoncan import Request
-        ServiceHelper.validate_int(session, min=0, max=0x7F, name='Session number')
+        ServiceHelper.validate_int(session, min=0, max=0x7F, name=u'Session number')
         return Request(service=cls, subfunction=session)
 
     @classmethod
     def interpret_response(cls, response, standard_version = latest_standard):
-        """
+        u"""
         Populates the response ``service_data`` property with an instance of :class:`DiagnosticSessionControl.ResponseData<udsoncan.services.DiagnosticSessionControl.ResponseData>`
 
         :param response: The received response to interpret
@@ -49,24 +51,24 @@ class DiagnosticSessionControl(BaseService):
         """
 
         if len(response.data) < 1: 	# Should not happen as response decoder will raise an exception.
-            raise InvalidResponseException(response, "Response data must be at least 1 bytes")
+            raise InvalidResponseException(response, u"Response data must be at least 1 bytes")
 
         response.service_data = cls.ResponseData()
-        response.service_data.session_echo = response.data[0]
-        response.service_data.session_param_records = response.data[1:] if len(response.data) > 1 else b''
+        response.service_data.session_echo = ord(response.data[0])
+        response.service_data.session_param_records = response.data[1:] if len(response.data) > 1 else ''
         
         if (standard_version >= 2013):
             if len(response.data) < 5:
-                raise InvalidResponseException(response, 'Response must contain 4 bytes of data representing the server timing requirements (P2 and P2* timeouts)')
+                raise InvalidResponseException(response, u'Response must contain 4 bytes of data representing the server timing requirements (P2 and P2* timeouts)')
 
-            (a,b) = struct.unpack('>HH', response.data[1:])
+            (a,b) = struct.unpack(u'>HH', response.data[1:])
             response.service_data.p2_server_max = (a)/1000
             response.service_data.p2_star_server_max = (b * 10)/1000
 
         return response
 
     class ResponseData(BaseResponseData):
-        """
+        u"""
         .. data:: session_echo
 
                 Request subfunction echoed back by the server
@@ -84,7 +86,7 @@ class DiagnosticSessionControl(BaseService):
                 Default P2* (NRC 0x78) max timing supported by the server for the activated diagnostic session. Applicable for 2013 version and above. Value in seconds
         """		
         def __init__(self):
-            super().__init__(DiagnosticSessionControl)
+            super(DiagnosticSessionControl.ResponseData, self).__init__(DiagnosticSessionControl)
             self.session_echo = None
             self.session_param_records = None
             self.p2_server_max = None

@@ -1,7 +1,9 @@
+from __future__ import absolute_import
 from test.UdsTest import UdsTest
 import threading
-import queue
-import _thread as thread
+import Queue
+import thread
+import traceback
 
 #Class borrowed from Python Socket test suite.
 class ThreadableTest(UdsTest):
@@ -20,19 +22,20 @@ class ThreadableTest(UdsTest):
         self.server_ready = threading.Event()
         self.client_ready = threading.Event()
         self.done = threading.Event()
-        self.queue = queue.Queue(1)
+        self.queue = Queue.Queue(1)
         self.server_crashed = False
 
         # Do some munging to start the client test.
         methodname = self.id()
-        i = methodname.rfind('.')
+        i = methodname.rfind(u'.')
         methodname = methodname[i+1:]
-        test_method = getattr(self, '_' + methodname)
+        test_method = getattr(self, u'_' + methodname)
         self.client_thread = thread.start_new_thread(self.clientRun, (test_method,))
 
         try:
             self.__setUp()
         except:
+            traceback.print_exc()
             self.server_crashed = True
             raise
         finally:
@@ -51,7 +54,8 @@ class ThreadableTest(UdsTest):
         self.server_ready.wait()
         try:
             self.clientSetUp()
-        except BaseException as e:
+        except BaseException, e:
+            traceback.print_exc()
             self.queue.put(e)
             self.client_ready.set()
             self._clientTearDown()
@@ -62,24 +66,26 @@ class ThreadableTest(UdsTest):
         if self.server_crashed:
             self._clientTearDown()
             return
-        if not hasattr(test_func, '__call__'):
-            raise TypeError("test_func must be a callable function")
+        if not hasattr(test_func, u'__call__'):
+            raise TypeError(u"test_func must be a callable function")
         try:
             test_func()
-        except BaseException as e:
+        except BaseException, e:
+            traceback.print_exc()
             self.queue.put(e)
         finally:
             self._clientTearDown()
 
     def clientSetUp(self):
-        raise NotImplementedError("clientSetUp must be implemented.")
+        raise NotImplementedError(u"clientSetUp must be implemented.")
 
     def _clientTearDown(self):
         self.done.set()
         try:
-            if hasattr(self, 'clientTearDown'):
+            if hasattr(self, u'clientTearDown'):
                 self.clientTearDown()
-        except BaseException as e:
+        except BaseException, e:
+            traceback.print_exc()
             self.queue.put(e)
         finally:			
             thread.exit()

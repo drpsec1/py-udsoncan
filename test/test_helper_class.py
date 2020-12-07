@@ -1,3 +1,5 @@
+from __future__ import with_statement
+from __future__ import absolute_import
 from udsoncan import DataFormatIdentifier, AddressAndLengthFormatIdentifier,MemoryLocation, CommunicationType, Baudrate, IOMasks, IOValues, Dtc, DidCodec, AsciiCodec, Filesize
 from test.UdsTest import UdsTest
 import struct
@@ -5,11 +7,11 @@ import struct
 class TestAddressAndLengthFormatIdentifier(UdsTest):
     def test_ali_1(self):
         alfid = AddressAndLengthFormatIdentifier(memorysize_format=8, address_format=8)
-        self.assertEqual(alfid.get_byte(),b'\x11')
+        self.assertEqual(alfid.get_byte(),'\x11')
 
     def test_ali_2(self):
         alfid = AddressAndLengthFormatIdentifier(memorysize_format=16, address_format=8)
-        self.assertEqual(alfid.get_byte(),b'\x21')
+        self.assertEqual(alfid.get_byte(),'\x21')
 
     def test_ali_oob_values(self):	# Out Of Bounds Value
         with self.assertRaises(ValueError):
@@ -28,28 +30,28 @@ class TestAddressAndLengthFormatIdentifier(UdsTest):
             AddressAndLengthFormatIdentifier(memorysize_format=8, address_format=48)
 
         with self.assertRaises(ValueError):
-            AddressAndLengthFormatIdentifier(memorysize_format='8', address_format=8)
+            AddressAndLengthFormatIdentifier(memorysize_format=u'8', address_format=8)
 
         with self.assertRaises(ValueError):
-            AddressAndLengthFormatIdentifier(memorysize_format=8, address_format='8')
+            AddressAndLengthFormatIdentifier(memorysize_format=8, address_format=u'8')
 
     def test_str_repr(self):
         alfid = AddressAndLengthFormatIdentifier(memorysize_format=8, address_format=8)
-        str(alfid)
+        unicode(alfid)
         alfid.__repr__()
 
 class TestDataFormatIdentifier(UdsTest):
     def test_dfi(self):
         dfi = DataFormatIdentifier(compression=1, encryption=2)
-        self.assertEqual(dfi.get_byte(),b'\x12')
+        self.assertEqual(dfi.get_byte(),'\x12')
 
     def test_dfi2(self):
         dfi = DataFormatIdentifier(compression=15, encryption=15)
-        self.assertEqual(dfi.get_byte(),b'\xFF')
+        self.assertEqual(dfi.get_byte(),'\xFF')
 
     def test_str_repr(self):
         dfi = DataFormatIdentifier(compression=1, encryption=2)
-        str(dfi)
+        unicode(dfi)
         dfi.__repr__()
 
     def test_from_byte(self):
@@ -74,99 +76,99 @@ class TestDataFormatIdentifier(UdsTest):
 class TestMemoryLocation(UdsTest):
     def test_memloc1(self):
         memloc = MemoryLocation(address=0x1234, memorysize=0x78, address_format=16, memorysize_format=8)
-        self.assertEqual(memloc.get_address_bytes(), b'\x12\x34')
-        self.assertEqual(memloc.get_memorysize_bytes(), b'\x78')
+        self.assertEqual(memloc.get_address_bytes(), '\x12\x34')
+        self.assertEqual(memloc.get_memorysize_bytes(), '\x78')
 
     def test_memloc_autosize1(self):
         memloc = MemoryLocation(address=0x1234, memorysize=0x78)
-        self.assertEqual(memloc.get_address_bytes(), b'\x12\x34')
-        self.assertEqual(memloc.get_memorysize_bytes(), b'\x78')
+        self.assertEqual(memloc.get_address_bytes(), '\x12\x34')
+        self.assertEqual(memloc.get_memorysize_bytes(), '\x78')
 
     def test_memloc_autosize2(self):
         memloc = MemoryLocation(address=0x1234567, memorysize=0x789abb)
-        self.assertEqual(memloc.get_address_bytes(), b'\x01\x23\x45\x67')
-        self.assertEqual(memloc.get_memorysize_bytes(), b'\x78\x9a\xbb')
+        self.assertEqual(memloc.get_address_bytes(), '\x01\x23\x45\x67')
+        self.assertEqual(memloc.get_memorysize_bytes(), '\x78\x9a\xbb')
 
     def test_memloc_str_repr(self):
         memloc = MemoryLocation(address=0x1234, memorysize=0x78, address_format=16, memorysize_format=8)
-        str(memloc)
+        unicode(memloc)
         memloc.__repr__()
 
     def test_memloc_override(self):
         memloc = MemoryLocation(address=0x1234, memorysize=0x78)
-        self.assertEqual(memloc.get_address_bytes(), b'\x12\x34')
-        self.assertEqual(memloc.get_memorysize_bytes(), b'\x78')
+        self.assertEqual(memloc.get_address_bytes(), '\x12\x34')
+        self.assertEqual(memloc.get_memorysize_bytes(), '\x78')
         memloc.set_format_if_none(address_format=32)
-        self.assertEqual(memloc.get_address_bytes(), b'\x00\x00\x12\x34')
-        self.assertEqual(memloc.get_memorysize_bytes(), b'\x78')
+        self.assertEqual(memloc.get_address_bytes(), '\x00\x00\x12\x34')
+        self.assertEqual(memloc.get_memorysize_bytes(), '\x78')
         memloc.set_format_if_none(memorysize_format=24)
-        self.assertEqual(memloc.get_address_bytes(), b'\x00\x00\x12\x34')
-        self.assertEqual(memloc.get_memorysize_bytes(), b'\x00\x00\x78')
+        self.assertEqual(memloc.get_address_bytes(), '\x00\x00\x12\x34')
+        self.assertEqual(memloc.get_memorysize_bytes(), '\x00\x00\x78')
 
         memloc = MemoryLocation(address=0x1234, memorysize=0x78)
         memloc.set_format_if_none(address_format=32, memorysize_format=24)	# Both at same time.
-        self.assertEqual(memloc.get_address_bytes(), b'\x00\x00\x12\x34')
-        self.assertEqual(memloc.get_memorysize_bytes(), b'\x00\x00\x78')
+        self.assertEqual(memloc.get_address_bytes(), '\x00\x00\x12\x34')
+        self.assertEqual(memloc.get_memorysize_bytes(), '\x00\x00\x78')
 
 
     def test_memloc_from_bytes(self):
-        memloc = MemoryLocation.from_bytes(address_bytes=b'\x12\x34', memorysize_bytes=b'\xFF')
+        memloc = MemoryLocation.from_bytes(address_bytes='\x12\x34', memorysize_bytes='\xFF')
         self.assertEqual(memloc.address, 0x1234)
         self.assertEqual(memloc.memorysize, 0xFF)
         self.assertEqual(memloc.address_format, 16)
         self.assertEqual(memloc.memorysize_format, 8)
 
-        memloc = MemoryLocation.from_bytes(address_bytes=b'\x12\x34\x56', memorysize_bytes=b'\x66\x77\x88')
+        memloc = MemoryLocation.from_bytes(address_bytes='\x12\x34\x56', memorysize_bytes='\x66\x77\x88')
         self.assertEqual(memloc.address, 0x123456)
         self.assertEqual(memloc.memorysize, 0x667788)
         self.assertEqual(memloc.address_format, 24)
         self.assertEqual(memloc.memorysize_format, 24)
 
     def test_memloc_max_size(self):
-        MemoryLocation.from_bytes(address_bytes=b'\x12\x34\x56\x78\x9a', memorysize_bytes=b'\xFF')
+        MemoryLocation.from_bytes(address_bytes='\x12\x34\x56\x78\x9a', memorysize_bytes='\xFF')
         with self.assertRaises(ValueError):
-            MemoryLocation.from_bytes(address_bytes=b'\x12\x34\x56\x78\x9a\xbc', memorysize_bytes=b'\xFF')
+            MemoryLocation.from_bytes(address_bytes='\x12\x34\x56\x78\x9a\xbc', memorysize_bytes='\xFF')
 
-        MemoryLocation.from_bytes(address_bytes=b'\x12\x34', memorysize_bytes=b'\x12\x34\x56\x78')
+        MemoryLocation.from_bytes(address_bytes='\x12\x34', memorysize_bytes='\x12\x34\x56\x78')
         with self.assertRaises(ValueError):
-            MemoryLocation.from_bytes(address_bytes=b'\x12\x34', memorysize_bytes=b'\x12\x34\x56\x78\x9a')
+            MemoryLocation.from_bytes(address_bytes='\x12\x34', memorysize_bytes='\x12\x34\x56\x78\x9a')
 
 
 class TestCommunicationType(UdsTest):
     def test_make(self):
         comtype = CommunicationType(subnet=CommunicationType.Subnet.node, normal_msg=True, network_management_msg=False)
-        self.assertEqual(comtype.get_byte(), b'\x01')
+        self.assertEqual(comtype.get_byte(), '\x01')
 
         comtype = CommunicationType(subnet=CommunicationType.Subnet.network, normal_msg=True, network_management_msg=False)
-        self.assertEqual(comtype.get_byte(), b'\xF1')
+        self.assertEqual(comtype.get_byte(), '\xF1')
 
         comtype = CommunicationType(subnet=3, normal_msg=True, network_management_msg=True)
-        self.assertEqual(comtype.get_byte(), b'\x33')
+        self.assertEqual(comtype.get_byte(), '\x33')
 
     def test_str_repr(self):
         comtype = CommunicationType(subnet=CommunicationType.Subnet.node, normal_msg=True, network_management_msg=False)
-        str(comtype)
+        unicode(comtype)
         comtype.__repr__()
 
     def test_from_byte(self):
-        comtype = CommunicationType.from_byte(b'\x01')
-        self.assertEqual(comtype.get_byte(), b'\x01')
+        comtype = CommunicationType.from_byte('\x01')
+        self.assertEqual(comtype.get_byte(), '\x01')
 
-        comtype = CommunicationType.from_byte(b'\xF1')
-        self.assertEqual(comtype.get_byte(), b'\xF1')
+        comtype = CommunicationType.from_byte('\xF1')
+        self.assertEqual(comtype.get_byte(), '\xF1')
 
-        comtype = CommunicationType.from_byte(b'\x33')
-        self.assertEqual(comtype.get_byte(), b'\x33')
+        comtype = CommunicationType.from_byte('\x33')
+        self.assertEqual(comtype.get_byte(), '\x33')
 
         comtype = CommunicationType.from_byte(0x01)
-        self.assertEqual(comtype.get_byte(), b'\x01')
+        self.assertEqual(comtype.get_byte(), '\x01')
 
     def test_oob_values(self):
         with self.assertRaises(ValueError):
             CommunicationType(subnet=0, normal_msg=False, network_management_msg=False)
 
         with self.assertRaises(ValueError):
-            CommunicationType(subnet='x', normal_msg=True, network_management_msg=False)
+            CommunicationType(subnet=u'x', normal_msg=True, network_management_msg=False)
 
         with self.assertRaises(ValueError):
             CommunicationType(subnet=0, normal_msg=1, network_management_msg=True)
@@ -177,22 +179,22 @@ class TestCommunicationType(UdsTest):
 class TestBaudrate(UdsTest):
     def test_create_fixed(self):
         br = Baudrate(115200, baudtype=Baudrate.Type.Fixed)
-        self.assertEqual(br.get_bytes(), b'\x05')
+        self.assertEqual(br.get_bytes(), '\x05')
 
         with self.assertRaises(ValueError):
             br = Baudrate(123456, baudtype=Baudrate.Type.Fixed)
 
     def test_create_specific(self):
         br = Baudrate(115200, baudtype=Baudrate.Type.Specific)
-        self.assertEqual(br.get_bytes(), b'\x01\xC2\x00')
+        self.assertEqual(br.get_bytes(), '\x01\xC2\x00')
 
         with self.assertRaises(ValueError):
             br = Baudrate(0x1000000, baudtype=Baudrate.Type.Specific)
 
     def test_create_id(self):
-        for i in range (0xFF):
+        for i in xrange (0xFF):
             br = Baudrate(i, baudtype=Baudrate.Type.Identifier)
-            self.assertEqual(br.get_bytes(), struct.pack('B', i))
+            self.assertEqual(br.get_bytes(), struct.pack(u'B', i))
 
         with self.assertRaises(ValueError):
             br = Baudrate(0x100, baudtype=Baudrate.Type.Identifier)
@@ -204,35 +206,35 @@ class TestBaudrate(UdsTest):
     def test_change_type(self):
         br = Baudrate(115200, baudtype=Baudrate.Type.Fixed)
         br2 = br.make_new_type(Baudrate.Type.Specific)
-        self.assertEqual(br2.get_bytes(), b'\x01\xC2\x00')
+        self.assertEqual(br2.get_bytes(), '\x01\xC2\x00')
 
         br = Baudrate(115200, baudtype=Baudrate.Type.Specific)
         br2 = br.make_new_type(Baudrate.Type.Fixed)
-        self.assertEqual(br2.get_bytes(), b'\x05')
+        self.assertEqual(br2.get_bytes(), '\x05')
 
     def test_str_repr(self):
         br = Baudrate(115200, baudtype=Baudrate.Type.Fixed)
-        str(br)
+        unicode(br)
         br.__repr__()
 
     def test_create_auto(self):
         # Direct ID
         br = Baudrate(1)
-        self.assertEqual(br.get_bytes(), b'\x01')
+        self.assertEqual(br.get_bytes(), '\x01')
 
         br = Baudrate(0xFF)
-        self.assertEqual(br.get_bytes(), b'\xFF')
+        self.assertEqual(br.get_bytes(), '\xFF')
 
         # Fixed baudrate
         br = Baudrate(115200)
-        self.assertEqual(br.get_bytes(), b'\x05')
+        self.assertEqual(br.get_bytes(), '\x05')
 
         br = Baudrate(500000)
-        self.assertEqual(br.get_bytes(), b'\x12')
+        self.assertEqual(br.get_bytes(), '\x12')
 
         #Specific Baudrate:
         br = Baudrate(0x123456)
-        self.assertEqual(br.get_bytes(), b'\x12\x34\x56')
+        self.assertEqual(br.get_bytes(), '\x12\x34\x56')
 
     def test_oob_values(self):
         with self.assertRaises(ValueError):
@@ -247,25 +249,25 @@ class TestBaudrate(UdsTest):
 class TestIOMasks(UdsTest):
     def test_oob_values(self):
         with self.assertRaises(ValueError):
-            IOMasks(aaa='asd')
+            IOMasks(aaa=u'asd')
 
         with self.assertRaises(ValueError):
             IOMasks(1,2,3)
 
     def test_make_dict(self):
-        m = IOMasks('aaa', 'bbb') # Correct syntax
-        self.assertEqual(m.get_dict(), {'aaa' : True, 'bbb' : True})
+        m = IOMasks(u'aaa', u'bbb') # Correct syntax
+        self.assertEqual(m.get_dict(), {u'aaa' : True, u'bbb' : True})
 
-        m = IOMasks('aaa', 'bbb', ccc=True, ddd=False) # Correct syntax
-        self.assertEqual(m.get_dict(), {'aaa' : True, 'bbb' : True, 'ccc':True, 'ddd':False})
+        m = IOMasks(u'aaa', u'bbb', ccc=True, ddd=False) # Correct syntax
+        self.assertEqual(m.get_dict(), {u'aaa' : True, u'bbb' : True, u'ccc':True, u'ddd':False})
 
 class TestDtc(UdsTest):
     def test_init(self):
         dtc = Dtc(0x1234)
         self.assertEqual(dtc.id, 0x1234 )
-        self.assertEqual(dtc.status.get_byte(), b'\x00')
+        self.assertEqual(dtc.status.get_byte(), '\x00')
         self.assertEqual(dtc.status.get_byte_as_int(), 0x00)
-        self.assertEqual(dtc.severity.get_byte(), b'\x00')
+        self.assertEqual(dtc.severity.get_byte(), '\x00')
         self.assertEqual(dtc.severity.get_byte_as_int(), 0x00)
 
         self.assertEqual(dtc.status.test_failed, False)
@@ -282,29 +284,29 @@ class TestDtc(UdsTest):
 
     def test_set_status_with_byte_no_error(self):
         dtc=Dtc(1)
-        for i in range(255):
+        for i in xrange(255):
             dtc.status.set_byte(i)
 
     def test_status_behaviour(self):
         dtc=Dtc(1)
 
-        self.assertEqual(dtc.status.get_byte(), b'\x00')
+        self.assertEqual(dtc.status.get_byte(), '\x00')
         dtc.status.test_failed=True
-        self.assertEqual(dtc.status.get_byte(), b'\x01')
+        self.assertEqual(dtc.status.get_byte(), '\x01')
         dtc.status.test_failed_this_operation_cycle = True
-        self.assertEqual(dtc.status.get_byte(), b'\x03')
+        self.assertEqual(dtc.status.get_byte(), '\x03')
         dtc.status.pending = True
-        self.assertEqual(dtc.status.get_byte(), b'\x07')
+        self.assertEqual(dtc.status.get_byte(), '\x07')
         dtc.status.confirmed = True
-        self.assertEqual(dtc.status.get_byte(), b'\x0F')
+        self.assertEqual(dtc.status.get_byte(), '\x0F')
         dtc.status.test_not_completed_since_last_clear = True
-        self.assertEqual(dtc.status.get_byte(), b'\x1F')
+        self.assertEqual(dtc.status.get_byte(), '\x1F')
         dtc.status.test_failed_since_last_clear = True
-        self.assertEqual(dtc.status.get_byte(), b'\x3F')
+        self.assertEqual(dtc.status.get_byte(), '\x3F')
         dtc.status.test_not_completed_this_operation_cycle = True
-        self.assertEqual(dtc.status.get_byte(), b'\x7F')
+        self.assertEqual(dtc.status.get_byte(), '\x7F')
         dtc.status.warning_indicator_requested = True
-        self.assertEqual(dtc.status.get_byte(), b'\xFF')
+        self.assertEqual(dtc.status.get_byte(), '\xFF')
 
         dtc.status.set_byte(0x01)
         self.assertEqual(dtc.status.test_failed, True)
@@ -388,13 +390,13 @@ class TestDtc(UdsTest):
 
     def test_set_severity_with_byte_no_error(self):
         dtc=Dtc(1)
-        for i in range(255):
+        for i in xrange(255):
             dtc.severity.set_byte(i)
 
     def test_str_repr(self):
         dtc=Dtc(0x123456)
         dtc.status.pending = True
-        str(dtc)
+        unicode(dtc)
         dtc.__repr__()
 
 
@@ -428,25 +430,25 @@ class TestCodec(UdsTest):
     def test_DIDCodec_bad_values(self):
         with self.assertRaises(NotImplementedError):
             codec = DidCodec();
-            codec.encode("asd")
+            codec.encode(u"asd")
 
         with self.assertRaises(NotImplementedError):
             codec = DidCodec();
-            codec.decode(b"asd")
+            codec.decode("asd")
 
         with self.assertRaises(ValueError):
-            DidCodec.from_config("")
+            DidCodec.from_config(u"")
 
     def test_ascii_codec(self):
         codec = AsciiCodec(10)
-        self.assertEqual(codec.encode("abcdefghij"), b'abcdefghij');
-        self.assertEqual(codec.decode(b"abcdefghij"), 'abcdefghij');
+        self.assertEqual(codec.encode(u"abcdefghij"), 'abcdefghij');
+        self.assertEqual(codec.decode("abcdefghij"), u'abcdefghij');
 
         with self.assertRaises(ValueError):
-            codec.encode("abc")
+            codec.encode(u"abc")
 
         with self.assertRaises(ValueError):
-            codec.encode("abcdefghijklmnop")
+            codec.encode(u"abcdefghijklmnop")
 
         with self.assertRaises(ValueError):
             AsciiCodec()
@@ -500,33 +502,33 @@ class TestFilesize(UdsTest):
 
     def test_bytes(self):
 
-        self.assertEqual(Filesize(uncompressed=0xFF).get_uncompressed_bytes(), b'\xFF')
-        self.assertEqual(Filesize(uncompressed=0x12345678).get_uncompressed_bytes(), b'\x12\x34\x56\x78')
-        self.assertEqual(Filesize(uncompressed=0x1234, width=4).get_uncompressed_bytes(), b'\x00\x00\x12\x34')
-        self.assertEqual(Filesize(uncompressed=0xFF).get_compressed_bytes(), b'')
+        self.assertEqual(Filesize(uncompressed=0xFF).get_uncompressed_bytes(), '\xFF')
+        self.assertEqual(Filesize(uncompressed=0x12345678).get_uncompressed_bytes(), '\x12\x34\x56\x78')
+        self.assertEqual(Filesize(uncompressed=0x1234, width=4).get_uncompressed_bytes(), '\x00\x00\x12\x34')
+        self.assertEqual(Filesize(uncompressed=0xFF).get_compressed_bytes(), '')
 
-        self.assertEqual(Filesize(compressed=0xFF).get_compressed_bytes(), b'\xFF')
-        self.assertEqual(Filesize(compressed=0x12345678).get_compressed_bytes(), b'\x12\x34\x56\x78')
-        self.assertEqual(Filesize(compressed=0x1234, width=4).get_compressed_bytes(), b'\x00\x00\x12\x34')
-        self.assertEqual(Filesize(compressed=0x12345678).get_uncompressed_bytes(), b'')
+        self.assertEqual(Filesize(compressed=0xFF).get_compressed_bytes(), '\xFF')
+        self.assertEqual(Filesize(compressed=0x12345678).get_compressed_bytes(), '\x12\x34\x56\x78')
+        self.assertEqual(Filesize(compressed=0x1234, width=4).get_compressed_bytes(), '\x00\x00\x12\x34')
+        self.assertEqual(Filesize(compressed=0x12345678).get_uncompressed_bytes(), '')
 
     def test_bad_values(self):
         with self.assertRaises(ValueError):
             Filesize();
 
         with self.assertRaises(ValueError):
-            Filesize(uncompressed='asd')
+            Filesize(uncompressed=u'asd')
 
         with self.assertRaises(ValueError):
-            Filesize(compressed='asd')
+            Filesize(compressed=u'asd')
 
         with self.assertRaises(ValueError):
-            Filesize(compressed=123, width='asd')
+            Filesize(compressed=123, width=u'asd')
 
         with self.assertRaises(ValueError):
             Filesize(compressed=123, width=0)
 
     def test_str_repr(self):
         fs = Filesize(uncompressed=123)
-        str(fs)
+        unicode(fs)
         fs.__repr__()

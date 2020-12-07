@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -6,10 +7,10 @@ class CommunicationControl(BaseService):
     _sid = 0x28
 
     class ControlType(BaseSubfunction):
-        """
+        u"""
         CommunicationControl defined subfunctions
         """		
-        __pretty_name__ = 'control type' 
+        __pretty_name__ = u'control type' 
 
         enableRxAndTx = 0
         enableRxAndDisableTx = 1
@@ -26,17 +27,17 @@ class CommunicationControl(BaseService):
     def normalize_communication_type(self, communication_type):
         from udsoncan import CommunicationType
 
-        if not isinstance(communication_type, CommunicationType) and not isinstance(communication_type, int) and not isinstance(communication_type, bytes):
-            raise ValueError('communication_type must either be a CommunicationType object or an integer')
+        if not isinstance(communication_type, CommunicationType) and not isinstance(communication_type, (int, long)) and not isinstance(communication_type, str):
+            raise ValueError(u'communication_type must either be a CommunicationType object or an integer')
 
-        if isinstance(communication_type, int) or isinstance(communication_type, bytes):
+        if isinstance(communication_type, (int, long)) or isinstance(communication_type, str):
             communication_type = CommunicationType.from_byte(communication_type)
 
         return communication_type
 
     @classmethod
     def make_request(cls, control_type, communication_type):
-        """
+        u"""
         Generates a request for CommunicationControl
 
         :param control_type: Service subfunction. Allowed values are from 0 to 0x7F
@@ -49,7 +50,7 @@ class CommunicationControl(BaseService):
         """		
         from udsoncan import Request
 
-        ServiceHelper.validate_int(control_type, min=0, max=0x7F, name='Control type')
+        ServiceHelper.validate_int(control_type, min=0, max=0x7F, name=u'Control type')
 
         communication_type = cls.normalize_communication_type(communication_type)
         request = Request(service=cls, subfunction=control_type)
@@ -59,7 +60,7 @@ class CommunicationControl(BaseService):
 
     @classmethod
     def interpret_response(cls, response):
-        """
+        u"""
         Populates the response ``service_data`` property with an instance of :class:`CommunicationControl.ResponseData<udsoncan.services.CommunicationControl.ResponseData>`
 
         :param response: The received response to interpret
@@ -68,17 +69,17 @@ class CommunicationControl(BaseService):
         :raises InvalidResponseException: If length of ``response.data`` is too short
         """		
         if len(response.data) < 1: 	
-            raise InvalidResponseException(response, "Response data must be at least 1 byte")
+            raise InvalidResponseException(response, u"Response data must be at least 1 byte")
 
         response.service_data = cls.ResponseData()
-        response.service_data.control_type_echo = response.data[0]
+        response.service_data.control_type_echo = ord(response.data[0])
 
     class ResponseData(BaseResponseData):
-        """
+        u"""
         .. data:: control_type_echo
 
                 Request subfunction echoed back by the server
         """		
         def __init__(self):
-            super().__init__(CommunicationControl)
+            super(CommunicationControl.ResponseData, self).__init__(CommunicationControl)
             self.control_type_echo = None

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -6,11 +7,11 @@ class AccessTimingParameter(BaseService):
     _sid = 0x83
 
     class AccessType(BaseSubfunction):
-        """
+        u"""
         AccessTimingParameter defined subfunctions
         """
 
-        __pretty_name__ = 'access type'
+        __pretty_name__ = u'access type'
 
         readExtendedTimingParameterSet = 1
         setTimingParametersToDefaultValues = 2
@@ -25,7 +26,7 @@ class AccessTimingParameter(BaseService):
 
     @classmethod
     def make_request(cls, access_type, timing_param_record=None):
-        """
+        u"""
         Generates a request for AccessTimingParameter
 
         :param access_type: Service subfunction. Allowed values are from 0 to 0x7F
@@ -38,26 +39,26 @@ class AccessTimingParameter(BaseService):
         """
         from udsoncan import Request
 
-        ServiceHelper.validate_int(access_type, min=0, max=0x7F, name='Access type')
+        ServiceHelper.validate_int(access_type, min=0, max=0x7F, name=u'Access type')
 
         if timing_param_record is not None and access_type != cls.AccessType.setTimingParametersToGivenValues :
-            raise ValueError('timing_param_record can only be set when access_type is setTimingParametersToGivenValues"')
+            raise ValueError(u'timing_param_record can only be set when access_type is setTimingParametersToGivenValues"')
 
         if timing_param_record is None and access_type == cls.AccessType.setTimingParametersToGivenValues :
-            raise ValueError('A timing_param_record must be provided when access_type is "setTimingParametersToGivenValues"')
+            raise ValueError(u'A timing_param_record must be provided when access_type is "setTimingParametersToGivenValues"')
 
         request = Request(service=cls, subfunction=access_type)
 
         if timing_param_record is not None:
-            if not isinstance(timing_param_record, bytes):
-                raise ValueError("timing_param_record must be a valid bytes objects")
+            if not isinstance(timing_param_record, str):
+                raise ValueError(u"timing_param_record must be a valid bytes objects")
             request.data += timing_param_record
 
         return request
 
     @classmethod
     def interpret_response(cls, response):
-        """
+        u"""
         Populates the response ``service_data`` property with an instance of :class:`AccessTimingParameter.ResponseData<udsoncan.services.AccessTimingParameter.ResponseData>`
 
         :param response: The received response to interpret
@@ -66,14 +67,14 @@ class AccessTimingParameter(BaseService):
         :raises InvalidResponseException: If length of ``response.data`` is too short
         """
         if len(response.data) < 1: 	
-            raise InvalidResponseException(response, "Response data must be at least 1 byte")
+            raise InvalidResponseException(response, u"Response data must be at least 1 byte")
 
         response.service_data = cls.ResponseData()
-        response.service_data.access_type_echo = response.data[0]
-        response.service_data.timing_param_record = response.data[1:] if len(response.data) >1 else b''
+        response.service_data.access_type_echo = ord(response.data[0])
+        response.service_data.timing_param_record = response.data[1:] if len(response.data) >1 else ''
 
     class ResponseData(BaseResponseData):
-        """
+        u"""
         .. data:: access_type_echo
 
                 Request subfunction echoed back by the server
@@ -84,7 +85,7 @@ class AccessTimingParameter(BaseService):
         """
 
         def __init__(self):
-            super().__init__(AccessTimingParameter)
+            super(AccessTimingParameter.ResponseData, self).__init__(AccessTimingParameter)
             self.access_type_echo = None
             self.timing_param_record = None
 

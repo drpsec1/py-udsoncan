@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -11,7 +12,7 @@ class TesterPresent(BaseService):
 
     @classmethod
     def make_request(cls):
-        """
+        u"""
         Generates a request for TesterPresent
         """		
         from udsoncan import Request
@@ -19,7 +20,7 @@ class TesterPresent(BaseService):
 
     @classmethod
     def interpret_response(cls, response):
-        """
+        u"""
         Populates the response ``service_data`` property with an instance of :class:`TesterPresent.ResponseData<udsoncan.services.TesterPresent.ResponseData>`
 
         :param response: The received response to interpret
@@ -28,17 +29,17 @@ class TesterPresent(BaseService):
         :raises InvalidResponseException: If length of ``response.data`` is too short
         """		
         if  len(response.data) < 1:
-            raise InvalidResponseException(response, "Response data must be at least 1 bytes")
+            raise InvalidResponseException(response, u"Response data must be at least 1 bytes")
 
         response.service_data = cls.ResponseData()
-        response.service_data.subfunction_echo = response.data[0]
+        response.service_data.subfunction_echo = ord(response.data[0])
 
     class ResponseData(BaseResponseData):
-        """
+        u"""
         .. data:: subfunction_echo
 
                 Requests subfunction echoed back by the server. This value should always be 0
         """		
         def __init__(self):
-            super().__init__(TesterPresent)
+            super(TesterPresent.ResponseData, self).__init__(TesterPresent)
             self.subfunction_echo = None

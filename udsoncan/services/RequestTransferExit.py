@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from . import *
 from udsoncan.Response import Response
 from udsoncan.exceptions import *
@@ -13,7 +14,7 @@ class RequestTransferExit(BaseService):
 
     @classmethod
     def make_request(cls, data=None):
-        """
+        u"""
         Generates a request for RequestTransferExit
 
         :param data: Additional optional data to send to the server
@@ -23,15 +24,15 @@ class RequestTransferExit(BaseService):
         """			
         from udsoncan import Request, MemoryLocation
 
-        if data is not None and not isinstance(data, bytes):
-            raise ValueError('data must be a bytes object')
+        if data is not None and not isinstance(data, str):
+            raise ValueError(u'data must be a bytes object')
 
         request = Request(service=cls, data=data)
         return request
 
     @classmethod
     def interpret_response(cls, response):
-        """
+        u"""
         Populates the response ``service_data`` property with an instance of :class:`RequestTransferExit.ResponseData<udsoncan.services.RequestTransferExit.ResponseData>`
 
         :param response: The received response to interpret
@@ -41,11 +42,11 @@ class RequestTransferExit(BaseService):
         response.service_data.parameter_records = response.data
 
     class ResponseData(BaseResponseData):
-        """
+        u"""
         .. data:: parameter_records
 
                 bytes object containing optional data provided by the server
         """		
         def __init__(self):
-            super().__init__(RequestTransferExit)
+            super(RequestTransferExit.ResponseData, self).__init__(RequestTransferExit)
             self.parameter_records = None
