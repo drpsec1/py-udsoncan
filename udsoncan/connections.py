@@ -155,9 +155,7 @@ class SocketConnection(BaseConnection):
         self.opened = False
         self.rxthread = None
         self.sock = sock
-        self.sock.settimeout(0.1)	# for recv
         self.bufsize=bufsize
-
 
     def open(self):
         self.exit_requested = False
@@ -185,8 +183,9 @@ class SocketConnection(BaseConnection):
             except socket.timeout:
                 pass
             except Exception:
-                self.exit_requested = True
+                self.logger.exception(u'Fatal exception in RX thread')
 
+                self.exit_requested = True
 
     def close(self):
         self.exit_requested = True
