@@ -123,7 +123,7 @@ class Response(object):
             for member in inspect.getmembers(cls):
                 if isinstance(member[1], (int, long)):
                     if member[1] == given_id:
-                        return member[0]
+                        return unicode(member[0])
             return unicode(given_id)
 
         #Tells if a code is a negative code

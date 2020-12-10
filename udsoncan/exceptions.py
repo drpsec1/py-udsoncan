@@ -2,9 +2,9 @@ from __future__ import absolute_import
 import inspect
 def service_name(service):
     if inspect.isclass(service):
-        return service.__name__
+        return unicode(service.__name__)
     else:
-        return service.__class__.__name__
+        return unicode(service.__class__.__name__)
 
 class TimeoutException(Exception):
     u"""

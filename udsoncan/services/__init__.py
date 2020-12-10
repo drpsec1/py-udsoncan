@@ -30,11 +30,11 @@ class BaseSubfunction(object):
 
         for subfn in subfn_list:
             if isinstance(subfn[1], (int, long)):
-                if subfn[1] == subfn_id:	# [1] is value
-                    return subfn[0] 		# [0] is property name
+                if subfn[1] == subfn_id:     # [1] is value
+                    return unicode(subfn[0]) # [0] is property name
             elif isinstance(subfn[1], tuple):
                 if subfn_id >= subfn[1][0] or subfn_id <= subfn[1][1]:
-                    return subfn[0] 
+                    return unicode(subfn[0])
         name = cls.__name__ if not hasattr(cls, u'__pretty_name__') else cls.__pretty_name__
         return u'Custom %s' % name
 
@@ -94,7 +94,7 @@ class BaseService(ABC):
 
     @classmethod	# Returns the service name. Shortcut that works on class and instances
     def get_name(cls):
-        return cls.__name__
+        return unicode(cls.__name__)
 
     @classmethod	# Tells if the given response code is expected for this service according to UDS standard.
     def is_supported_negative_response(cls, code):
