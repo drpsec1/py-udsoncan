@@ -21,7 +21,7 @@ Installation
 
 using pip::
 
-    pip install git+git://github.com/autopi-io/py-udsoncan@<Commit UUID>#udsoncan
+    pip install 'git+git://github.com/autopi-io/py-udsoncan@<Commit UUID>#udsoncan'
 
 Example
 -------
